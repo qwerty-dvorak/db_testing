@@ -1,6 +1,6 @@
 -- ============================================================================
 -- 02_generate_sample.sql
--- Generates sample 1028-channel sensor payloads for testing
+-- Generates sample 1024-channel sensor payloads for testing
 -- ============================================================================
 
 -- Generate 100 rows of sample data with realistic-looking float arrays
@@ -16,5 +16,5 @@ SELECT
         ORDER BY i
     ) AS payload
 FROM generate_series(1, 10) AS s(idx)
-CROSS JOIN generate_series(1, 1028) AS i
+CROSS JOIN generate_series(1, 1024) AS i
 GROUP BY s.idx;

@@ -16,17 +16,37 @@ SELECT id, value
 FROM sensor_payloads,
 LATERAL jsonb_array_to_float8(payload) AS value;
 
--- B3: Global min / max across all 1.028 billion values
+-- B3: Global min / max across all 1.024 billion values
 EXPLAIN (ANALYZE, BUFFERS, TIMING)
 SELECT array_global_min(v), array_global_max(v)
 FROM sensor_payloads,
 LATERAL jsonb_array_to_float8(payload) AS v;
 
--- B4: Single-channel extraction (channel 512)
+-- B4: Single-channel min/max/avg (channel 512)
 EXPLAIN (ANALYZE, BUFFERS, TIMING)
-SELECT avg(extract_channel(payload, 511)) FROM sensor_payloads;
+SELECT
+    min(extract_channel(payload, 511)),
+    max(extract_channel(payload, 511)),
+    avg(extract_channel(payload, 511))
+FROM sensor_payloads;
 
--- B5: Per-row min/max (correlated subquery pattern)
+-- B5: Min/max for every channel across all rows.
+-- Returns 1024 rows: one row per channel.
+EXPLAIN (ANALYZE, BUFFERS, TIMING)
+SELECT
+    channel_idx,
+    min(value) AS min_value,
+    max(value) AS max_value
+FROM sensor_payloads
+CROSS JOIN LATERAL (
+    SELECT ord::int - 1 AS channel_idx, value::float8 AS value
+    FROM jsonb_array_elements_text(payload) WITH ORDINALITY AS e(value, ord)
+    WHERE ord <= 1024
+) AS channels
+GROUP BY channel_idx
+ORDER BY channel_idx;
+
+-- B6: Per-row min/max (correlated subquery pattern)
 EXPLAIN (ANALYZE, BUFFERS, TIMING)
 SELECT
     id,

@@ -2,7 +2,7 @@
 
 ## Overview
 
-Profiling JSONB extraction and aggregation over 1 million rows (1.028 billion float values) requires rigorous methodology to isolate architectural bottlenecks from environmental noise.
+Profiling JSONB extraction and aggregation over 1 million rows (1.024 billion float values) requires rigorous methodology to isolate architectural bottlenecks from environmental noise.
 
 ## Key Principles
 
@@ -88,7 +88,7 @@ Look for `external merge Disk` (bad) vs. `quicksort Memory` (good) in the Sort n
 | Type   | Sequential scan (index-only if possible) |
 | I/O    | Negligible (index scan) |
 
-### B2 — Full Unnest (All 1.028B Values)
+### B2 — Full Unnest (All 1.024B Values)
 
 ```sql
 EXPLAIN (ANALYZE, BUFFERS)
@@ -118,7 +118,27 @@ SELECT avg(extract_channel(payload, 511))
 FROM sensor_payloads;
 ```
 
-Benefit: scans only the JSONB tree path for one key without expanding all 1028 values.
+Benefit: scans only the JSONB tree path for one key without expanding all 1024 values.
+
+### B5 — Per-Channel Min/Max
+
+```sql
+EXPLAIN (ANALYZE, BUFFERS)
+SELECT
+    channel_idx,
+    min(value) AS min_value,
+    max(value) AS max_value
+FROM sensor_payloads
+CROSS JOIN LATERAL (
+    SELECT ord::int - 1 AS channel_idx, value::float8 AS value
+    FROM jsonb_array_elements_text(payload) WITH ORDINALITY AS e(value, ord)
+    WHERE ord <= 1024
+) AS channels
+GROUP BY channel_idx
+ORDER BY channel_idx;
+```
+
+This is the target query for “max/min of each channel in 1 million rows”. It scans 1.024B values and returns 1024 result rows.
 
 ## Automated Benchmark Suite
 
@@ -164,13 +184,6 @@ WHERE relname LIKE 'pg_toast_%'
    OR relname LIKE '%sensor_payloads%';
 ```
 
-## TimescaleDB Integration (Future)
+## Postgres-Only Layout Comparisons
 
-If migrating to columnar compression (TimescaleDB), the key benchmarks shift:
-
-| Metric              | PostgreSQL (JSONB) | TimescaleDB (Hypertable + Compression) |
-|---------------------|-------------------|----------------------------------------|
-| Storage (1M rows)   | ~2.3 GB raw       | ~180 MB (compressed, Gorilla + LZ4)   |
-| Single-channel avg  | 850 ms            | 12 ms                                  |
-| Global min (all)    | 12.1 s            | 85 ms                                  |
-| Continuous monthly agg | Full scan      | 0.56 ms (CAGG pre-computed)            |
+Use `sql/05_1024_channel_layout_benchmarks.sql` to compare JSONB array, JSONB object, native `float8[]`, normalized rows, and a generated 1024-column wide table. These tests intentionally avoid TimescaleDB and other storage extensions.

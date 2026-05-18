@@ -2,7 +2,7 @@
 -- 02_generate_sample_pg16.sql
 -- PostgreSQL 16-compatible sample data generator
 --
--- Generates N sensor payloads with 1028-channel arrays.
+-- Generates N sensor payloads with 1024-channel arrays.
 -- Compatible with PG 16 and PG 18.
 -- ============================================================================
 
@@ -18,5 +18,5 @@ SELECT jsonb_agg(
     ORDER BY i
 ) AS payload
 FROM generate_series(1, 10) AS s(idx)
-CROSS JOIN generate_series(1, 1028) AS i
+CROSS JOIN generate_series(1, 1024) AS i
 GROUP BY s.idx;

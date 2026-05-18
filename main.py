@@ -55,7 +55,7 @@ def cmd_query(args: argparse.Namespace) -> None:
 
 def cmd_generate(args: argparse.Namespace) -> None:
     conn = get_conn(args.host, args.port, args.db)
-    generate_samples(conn, n_rows=args.rows)
+    generate_samples(conn, n_rows=args.rows, channels=args.channels)
     conn.close()
     print(f"Done. Total rows: {row_count(get_conn(args.host, args.port, args.db)):,}")
 
@@ -85,6 +85,7 @@ def main() -> None:
 
     g = sub.add_parser("generate", help="Generate sample sensor data")
     g.add_argument("--rows", type=int, default=100, help="Number of rows to insert")
+    g.add_argument("--channels", type=int, default=1024, help="Channels per row")
 
     b = sub.add_parser("benchmark", help="Run benchmark suite")
     b.add_argument("--iterations", type=int, default=5, help="Runs per query")

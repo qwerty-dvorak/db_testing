@@ -1,6 +1,6 @@
 # db_testing — High-Dimensional Sensor Data in PostgreSQL
 
-Benchmarking framework for storing and querying **1028-channel floating-point sensor telemetry** at scale (1M+ rows) in PostgreSQL.
+Benchmarking framework for storing and querying **1024-channel floating-point sensor telemetry** at scale (1M+ rows) in PostgreSQL.
 
 ## Quick Start
 
@@ -17,8 +17,8 @@ uv run python setup_db.py
 # Status check
 uv run python main.py status
 
-# Generate 1000 sample rows
-uv run python main.py generate --rows 1000
+# Generate 1000 sample rows with 1024 channels each
+uv run python main.py generate --rows 1000 --channels 1024
 
 # Run benchmarks
 uv run python main.py benchmark --iterations 5
@@ -39,7 +39,7 @@ uv run python main.py query "SELECT count(*) FROM sensor_payloads"
 │   ├── connection.py            # psycopg connection helpers
 │   ├── schema.py                # Table create / drop / inspect
 │   ├── aggregates.py            # Custom aggregate SQL + installer
-│   ├── sample_data.py           # Synthetic 1028-channel data generator
+│   ├── sample_data.py           # Synthetic 1024-channel data generator
 │   ├── verify.py                # Verification checks + formatted report
 │   └── benchmark.py             # Timed benchmark runner
 ├── sql/
@@ -50,12 +50,14 @@ uv run python main.py query "SELECT count(*) FROM sensor_payloads"
 │   ├── 03_custom_aggregates.sql         # PG 18 aggregates
 │   ├── 03_custom_aggregates_pg16.sql    # PG 16 aggregates
 │   ├── 04_benchmark_queries.sql         # PG 18 benchmarks
-│   └── 04_benchmark_queries_pg16.sql    # PG 16 benchmarks
+│   ├── 04_benchmark_queries_pg16.sql    # PG 16 benchmarks
+│   └── 05_1024_channel_layout_benchmarks.sql # Postgres-only layout comparisons
 └── docs/
     ├── 01_architecture_overview.md       # JSONB internals, TOAST, MVCC
     ├── 02_setup_guide.md                 # Installation and configuration
     ├── 03_benchmarking.md                # EXPLAIN ANALYZE methodology
-    └── 04_custom_aggregates.md           # Aggregate API reference
+    ├── 04_custom_aggregates.md           # Aggregate API reference
+    └── 05_1024_channel_performance_plan.md # Postgres-only layout comparisons
 ```
 
 ## Table Schema
@@ -63,7 +65,7 @@ uv run python main.py query "SELECT count(*) FROM sensor_payloads"
 | Column      | Type                     | Description                       |
 |-------------|--------------------------|-----------------------------------|
 | `id`        | `UUID` (PK)              | UUID v4 (`gen_random_uuid()`)     |
-| `payload`   | `JSONB` (NOT NULL)       | 1028-element float8 array         |
+| `payload`   | `JSONB` (NOT NULL)       | 1024-element float8 array         |
 | `created_at`| `TIMESTAMPTZ`            | Ingestion timestamp               |
 
 ## Key Documentation
@@ -74,6 +76,7 @@ uv run python main.py query "SELECT count(*) FROM sensor_payloads"
 | [Setup Guide](docs/02_setup_guide.md) | Installation, configuration, troubleshooting |
 | [Benchmarking](docs/03_benchmarking.md) | EXPLAIN ANALYZE, work_mem tuning, metrics |
 | [Custom Aggregates](docs/04_custom_aggregates.md) | State functions, parallel execution, performance |
+| [1024-Channel Plan](docs/05_1024_channel_performance_plan.md) | Postgres-only JSONB, array, normalized, and wide-table benchmarks |
 
 ## Requirements
 

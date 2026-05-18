@@ -4,6 +4,7 @@ Measures wall-clock time for key query patterns:
 - Row count (sequential scan)
 - Full unnest of all payloads
 - Global min/max aggregation
+- Per-channel min/max aggregation
 - Single-channel extraction
 
 Usage:
@@ -59,8 +60,31 @@ BENCHMARK_QUERIES: list[tuple[str, str]] = [
         """,
     ),
     (
-        "Channel 512 avg",
-        "SELECT avg(extract_channel(payload, 511)) FROM sensor_payloads",
+        "Per-channel min/max (JSONB ordinality)",
+        """
+        SELECT
+            channel_idx,
+            min(value) AS min_value,
+            max(value) AS max_value
+        FROM sensor_payloads
+        CROSS JOIN LATERAL (
+            SELECT ord::int - 1 AS channel_idx, value::float8 AS value
+            FROM jsonb_array_elements_text(payload) WITH ORDINALITY AS e(value, ord)
+            WHERE ord <= 1024
+        ) AS channels
+        GROUP BY channel_idx
+        ORDER BY channel_idx
+        """,
+    ),
+    (
+        "Channel 512 min/max/avg",
+        """
+        SELECT
+            min(extract_channel(payload, 511)),
+            max(extract_channel(payload, 511)),
+            avg(extract_channel(payload, 511))
+        FROM sensor_payloads
+        """,
     ),
     (
         "Full unnest (all channels)",

@@ -84,8 +84,8 @@ CREATE TABLE sensor_payloads (
 # Run 5 iterations of each benchmark query
 uv run python main.py benchmark --iterations 5
 
-# Generate 1,000 rows of test data
-uv run python main.py generate --rows 1000
+# Generate 1,000 rows of test data with 1024 channels each
+uv run python main.py generate --rows 1000 --channels 1024
 
 # Run an ad-hoc query
 uv run python main.py query "SELECT count(*) FROM sensor_payloads"

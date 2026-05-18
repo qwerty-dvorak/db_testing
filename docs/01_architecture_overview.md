@@ -2,7 +2,7 @@
 
 ## Problem Statement
 
-A single sensor payload consists of **1028 discrete floating-point channels** (4-byte `float4` or 8-byte `float8`). At a scale of **1 million rows**, the raw uncompressed data footprint alone approaches several gigabytes — before accounting for MVCC overhead, indexing, and transaction metadata.
+A single sensor payload consists of **1024 discrete floating-point channels** (4-byte `float4` or 8-byte `float8`). At a scale of **1 million rows**, the raw uncompressed data footprint alone approaches several gigabytes — before accounting for MVCC overhead, indexing, and transaction metadata.
 
 ## Storage Layouts Compared
 
@@ -14,7 +14,7 @@ The `sensor_payloads` table uses a **JSONB column** for the payload. JSONB store
 - Supports GIN indexing (`jsonb_path_ops`)
 - Enables flexible schema evolution
 
-**The TOAST bottleneck:** A 1028-element `float8` array consumes ~8.2 KB, immediately exceeding the 2 KB tuple threshold. PostgreSQL's TOAST (The Oversized-Attribute Storage Technique) transparently:
+**The TOAST bottleneck:** A 1024-element `float8` array consumes ~8.0 KB, immediately exceeding the 2 KB tuple threshold. PostgreSQL's TOAST (The Oversized-Attribute Storage Technique) transparently:
 
 1. Compresses the JSONB payload
 2. Moves it to an out-of-line side table
@@ -34,14 +34,14 @@ Every analytical query forces a **Decompress → Modify → Compress** cycle acr
 
 ### 3. Normalised (EAV) Model
 
-Transforms columns into rows: 1 payload → 1028 rows.
+Transforms columns into rows: 1 payload → 1024 rows.
 
 - **Pro:** Avoids TOAST entirely
-- **Con:** 1 million payloads → 1.028 billion rows → ~23 GB of tuple header overhead alone
+- **Con:** 1 million payloads → 1.024 billion rows → ~23 GB of tuple header overhead alone
 
 ### 4. Wide Table Model
 
-1028 discrete `float8` columns.
+1024 discrete `float8` columns.
 
 - **Pro:** No TOAST for single-channel queries; columnar I/O
 - **Con:** Hard limit of 1600 columns; brittle schema; massive null bitmap overhead
