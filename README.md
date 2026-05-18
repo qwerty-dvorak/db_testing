@@ -14,6 +14,9 @@ uv sync
 # Or manually:
 uv run python setup_db.py
 
+# Include exact analytics summaries during setup:
+uv run python setup_db.py --analytics --rows 1000
+
 # Status check
 uv run python main.py status
 
@@ -22,6 +25,12 @@ uv run python main.py generate --rows 1000 --channels 1024
 
 # Run benchmarks
 uv run python main.py benchmark --iterations 5
+
+# Build exact summary-backed channel analytics
+uv run python main.py analytics-build --bucket-size "1 hour" --block-size 4096
+
+# Benchmark exact per-channel min/max and threshold counts
+uv run python main.py analytics-benchmark --threshold 50
 
 # Ad-hoc query
 uv run python main.py query "SELECT count(*) FROM sensor_payloads"
@@ -51,13 +60,15 @@ uv run python main.py query "SELECT count(*) FROM sensor_payloads"
 │   ├── 03_custom_aggregates_pg16.sql    # PG 16 aggregates
 │   ├── 04_benchmark_queries.sql         # PG 18 benchmarks
 │   ├── 04_benchmark_queries_pg16.sql    # PG 16 benchmarks
-│   └── 05_1024_channel_layout_benchmarks.sql # Postgres-only layout comparisons
+│   ├── 05_1024_channel_layout_benchmarks.sql # Postgres-only layout comparisons
+│   └── 06_channel_analytics.sql         # Exact summary/block analytics layer
 └── docs/
     ├── 01_architecture_overview.md       # JSONB internals, TOAST, MVCC
     ├── 02_setup_guide.md                 # Installation and configuration
     ├── 03_benchmarking.md                # EXPLAIN ANALYZE methodology
     ├── 04_custom_aggregates.md           # Aggregate API reference
-    └── 05_1024_channel_performance_plan.md # Postgres-only layout comparisons
+    ├── 05_1024_channel_performance_plan.md # Postgres-only layout comparisons
+    └── 06_channel_analytics_layer.md     # Exact min/max and threshold analytics
 ```
 
 ## Table Schema
@@ -77,6 +88,7 @@ uv run python main.py query "SELECT count(*) FROM sensor_payloads"
 | [Benchmarking](docs/03_benchmarking.md) | EXPLAIN ANALYZE, work_mem tuning, metrics |
 | [Custom Aggregates](docs/04_custom_aggregates.md) | State functions, parallel execution, performance |
 | [1024-Channel Plan](docs/05_1024_channel_performance_plan.md) | Postgres-only JSONB, array, normalized, and wide-table benchmarks |
+| [Channel Analytics Layer](docs/06_channel_analytics_layer.md) | Exact bucket summaries and sorted blocks for min/max and threshold counts |
 
 ## Requirements
 

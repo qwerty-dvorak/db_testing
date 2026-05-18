@@ -31,6 +31,7 @@ from scripts.schema import create_table, drop_table
 from scripts.aggregates import install_aggregates
 from scripts.sample_data import generate_samples
 from scripts.verify import verify_all, print_report
+from scripts.analytics import install_analytics, load_raw_from_jsonb, rebuild_analytics
 
 
 def find_pg_ctl() -> str | None:
@@ -114,6 +115,22 @@ def main() -> None:
         "--rows", type=int, default=100,
         help="Number of sample rows to insert (default: 100)",
     )
+    parser.add_argument(
+        "--analytics",
+        action="store_true",
+        help="Build exact channel analytics summaries after loading sample rows",
+    )
+    parser.add_argument(
+        "--bucket-size",
+        default="1 hour",
+        help="Analytics bucket interval when --analytics is set (default: 1 hour)",
+    )
+    parser.add_argument(
+        "--block-size",
+        type=int,
+        default=4096,
+        help="Analytics sorted value block size when --analytics is set (default: 4096)",
+    )
     args = parser.parse_args()
 
     if not args.no_start:
@@ -136,6 +153,13 @@ def main() -> None:
     print("[4/4] Verification ...")
     report = verify_all(conn)
     print_report(report)
+
+    if args.analytics:
+        print("[analytics] Building exact channel analytics ...")
+        install_analytics(conn)
+        load_raw_from_jsonb(conn)
+        rebuild_analytics(conn, args.bucket_size, args.block_size)
+        print("[analytics] Done")
 
     conn.close()
 

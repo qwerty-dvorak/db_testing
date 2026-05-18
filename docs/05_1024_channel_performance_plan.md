@@ -189,3 +189,5 @@ Start with three benchmarks:
 Use normalized rows only if product queries frequently ask for a small number of channels with selective time ranges. Avoid JSONB object unless named channels inside the payload are a hard requirement.
 
 The runnable SQL for these layouts is in `sql/05_1024_channel_layout_benchmarks.sql`.
+
+For exact production-style min/max and ad-hoc threshold counts, use the derived analytics layer in `sql/06_channel_analytics.sql` and `docs/06_channel_analytics_layer.md`.

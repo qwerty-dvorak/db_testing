@@ -25,6 +25,16 @@ from scripts.aggregates import verify_aggregates, aggregates_installed
 from scripts.sample_data import generate_samples
 from scripts.benchmark import run_benchmarks, print_results
 from scripts.verify import verify_all, print_report
+from scripts.analytics import (
+    analytics_installed,
+    analytics_status,
+    install_analytics,
+    load_raw_from_jsonb,
+    print_analytics_benchmarks,
+    print_status,
+    rebuild_analytics,
+    run_analytics_benchmarks,
+)
 
 
 def cmd_status(args: argparse.Namespace) -> None:
@@ -35,6 +45,7 @@ def cmd_status(args: argparse.Namespace) -> None:
     print(f"Rows:     {row_count(conn):,}")
     print(f"Size:     {table_size(conn)}")
     print(f"Aggregates: {'installed' if aggregates_installed(conn) else 'missing'}")
+    print(f"Analytics:  {'installed' if analytics_installed(conn) else 'missing'}")
     conn.close()
 
 
@@ -67,6 +78,46 @@ def cmd_benchmark(args: argparse.Namespace) -> None:
     conn.close()
 
 
+def cmd_analytics_init(args: argparse.Namespace) -> None:
+    conn = get_conn(args.host, args.port, args.db)
+    install_analytics(conn)
+    print("Analytics layer installed.")
+    conn.close()
+
+
+def cmd_analytics_build(args: argparse.Namespace) -> None:
+    conn = get_conn(args.host, args.port, args.db)
+    install_analytics(conn)
+    inserted = load_raw_from_jsonb(conn, clear_existing=not args.append_raw)
+    print(f"Loaded/updated raw array rows: {inserted:,}")
+    rebuild_analytics(conn, bucket_size=args.bucket_size, block_size=args.block_size)
+    print(
+        "Rebuilt channel analytics "
+        f"(bucket_size={args.bucket_size}, block_size={args.block_size})."
+    )
+    print_status(analytics_status(conn))
+    conn.close()
+
+
+def cmd_analytics_status(args: argparse.Namespace) -> None:
+    conn = get_conn(args.host, args.port, args.db)
+    print_status(analytics_status(conn))
+    conn.close()
+
+
+def cmd_analytics_benchmark(args: argparse.Namespace) -> None:
+    conn = get_conn(args.host, args.port, args.db)
+    results = run_analytics_benchmarks(
+        conn,
+        start_at=args.start,
+        end_at=args.end,
+        threshold=args.threshold,
+        bucket_size=args.bucket_size,
+    )
+    print_analytics_benchmarks(results)
+    conn.close()
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(
         description="High-dimensional sensor data benchmarking toolkit",
@@ -90,6 +141,44 @@ def main() -> None:
     b = sub.add_parser("benchmark", help="Run benchmark suite")
     b.add_argument("--iterations", type=int, default=5, help="Runs per query")
 
+    sub.add_parser("analytics-init", help="Install analytics tables and functions")
+
+    ab = sub.add_parser(
+        "analytics-build",
+        help="Load typed raw readings and rebuild exact analytics summaries",
+    )
+    ab.add_argument(
+        "--bucket-size",
+        default="1 hour",
+        help="date_bin bucket interval for summaries (default: 1 hour)",
+    )
+    ab.add_argument(
+        "--block-size",
+        type=int,
+        default=4096,
+        help="Sorted values per threshold block (default: 4096)",
+    )
+    ab.add_argument(
+        "--append-raw",
+        action="store_true",
+        help="Do not clear sensor_readings_raw before loading from JSONB",
+    )
+
+    sub.add_parser("analytics-status", help="Show analytics table row counts and sizes")
+
+    aq = sub.add_parser(
+        "analytics-benchmark",
+        help="Benchmark summary-backed min/max and threshold queries",
+    )
+    aq.add_argument("--start", help="Inclusive timestamptz lower bound")
+    aq.add_argument("--end", help="Exclusive timestamptz upper bound")
+    aq.add_argument("--threshold", type=float, default=50.0, help="Threshold value")
+    aq.add_argument(
+        "--bucket-size",
+        default="1 hour",
+        help="Summary bucket interval used during build (default: 1 hour)",
+    )
+
     args = parser.parse_args()
 
     commands = {
@@ -98,6 +187,10 @@ def main() -> None:
         "query": cmd_query,
         "generate": cmd_generate,
         "benchmark": cmd_benchmark,
+        "analytics-init": cmd_analytics_init,
+        "analytics-build": cmd_analytics_build,
+        "analytics-status": cmd_analytics_status,
+        "analytics-benchmark": cmd_analytics_benchmark,
     }
 
     commands[args.command](args)

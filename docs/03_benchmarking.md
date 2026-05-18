@@ -187,3 +187,24 @@ WHERE relname LIKE 'pg_toast_%'
 ## Postgres-Only Layout Comparisons
 
 Use `sql/05_1024_channel_layout_benchmarks.sql` to compare JSONB array, JSONB object, native `float8[]`, normalized rows, and a generated 1024-column wide table. These tests intentionally avoid TimescaleDB and other storage extensions.
+
+## Exact Summary-Backed Analytics
+
+Use `sql/06_channel_analytics.sql` or the Python CLI to build exact time-bucketed summaries and sorted value blocks:
+
+```bash
+uv run python main.py analytics-build --bucket-size "1 hour" --block-size 4096
+uv run python main.py analytics-benchmark --threshold 50
+```
+
+The optimized production query shapes are:
+
+```sql
+SELECT *
+FROM channel_minmax_exact($start, $end, '1 hour');
+
+SELECT *
+FROM channel_threshold_counts_exact($start, $end, $threshold, '1 hour');
+```
+
+These functions use summary tables for full buckets and scan raw readings only for partial boundary fragments.
