@@ -8,27 +8,18 @@
 | Python          | 3.13            | `python3 --version`           |
 | uv              | 0.5+            | `uv --version`                |
 
-## Quick Start (Shell)
-
-```bash
-# 1 — set up the database, schema, test data, and aggregates
-./setup.sh
-
-# 2 — verify
-./setup.sh  # runs verification at the end
-```
-
-## Quick Start (Python)
+## Quick Start
 
 ```bash
 # 1 — install dependencies
 uv sync
 
-# 2 — run the Python setup
-uv run python setup_db.py
+# 2 — set up the database, schema, test data, and aggregates
+./setup.sh
 
-# 3 — verify with the CLI
+# 3 — verify
 uv run python main.py status
+uv run python main.py verify
 ```
 
 ## Manual Step-by-Step
@@ -46,31 +37,23 @@ pg_ctl -D /tmp/pgdata -l /tmp/pgdata/logfile start
 ### 2. Create the Database
 
 ```bash
+# Via psycopg (recommended — no psql binary needed)
+uv run python -c "
+import psycopg
+conn = psycopg.connect('host=/tmp dbname=postgres')
+conn.autocommit = True
+conn.execute('CREATE DATABASE project_db')
+conn.close()
+"
+
+# Or via psql if available
 psql -h /tmp -d postgres -c "CREATE DATABASE project_db;"
 ```
 
-### 3. Create the Table
+### 3. Apply Schema and Aggregates
 
 ```bash
-psql -h /tmp -d project_db -f sql/01_create_table.sql
-```
-
-### 4. Install Custom Aggregates
-
-```bash
-psql -h /tmp -d project_db -f sql/03_custom_aggregates.sql
-```
-
-### 5. Load Test Data
-
-```bash
-psql -h /tmp -d project_db -f sql/02_generate_sample.sql
-```
-
-### 6. Verify
-
-```bash
-psql -h /tmp -d project_db -c "SELECT count(*) FROM sensor_payloads;"
+uv run python setup_db.py --no-start
 ```
 
 ## Table Schema
@@ -106,6 +89,9 @@ uv run python main.py generate --rows 1000
 
 # Run an ad-hoc query
 uv run python main.py query "SELECT count(*) FROM sensor_payloads"
+
+# Full verification report
+uv run python main.py verify
 ```
 
 ## Troubleshooting

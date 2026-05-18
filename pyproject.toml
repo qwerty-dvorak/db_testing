@@ -4,10 +4,10 @@ version = "0.2.0"
 description = "Scalability and performance benchmarking of high-dimensional sensor data in PostgreSQL"
 readme = "README.md"
 requires-python = ">=3.13"
-dependencies = []
+dependencies = ["psycopg>=3.2"]
 
 [project.scripts]
 db-testing = "main:main"
 
-[tool.uv]
-dev-dependencies = []
+[dependency-groups]
+dev = []
