@@ -1,3 +1,18 @@
+x-app-environment: &app-environment
+  PGHOST: db
+  PGPORT: "5432"
+  PGDATABASE: project_db
+  PGUSER: postgres
+  PGPASSWORD: postgres
+
+x-app-base: &app-base
+  build:
+    context: .
+  environment: *app-environment
+  depends_on:
+    db:
+      condition: service_healthy
+
 services:
   db:
     image: postgres:14
@@ -10,33 +25,47 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+    ports:
+      - "5433:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
   app:
-    build:
-      context: .
-    environment:
-      PGHOST: db
-      PGPORT: "5432"
-      PGDATABASE: project_db
-      PGUSER: postgres
-      PGPASSWORD: postgres
-    depends_on:
-      db:
-        condition: service_healthy
+    <<: *app-base
     command:
+      - uv
+      - run
+      - python
+      - main.py
+      - status
+
+  setup:
+    <<: *app-base
+    command:
+      - uv
+      - run
       - python
       - setup_db.py
       - --no-start
-      - --host
-      - db
-      - --port
-      - "5432"
-      - --db
-      - project_db
+      - --no-reset
       - --rows
-      - "100"
+      - "0"
+
+  seed:
+    <<: *app-base
+    command:
+      - uv
+      - run
+      - python
+      - main.py
+      - generate
+      - --bulk
+      - --rows
+      - "${SEED_ROWS:-10000}"
+      - --channels
+      - "${SEED_CHANNELS:-1024}"
+      - --batch-size
+      - "${SEED_BATCH_SIZE:-10000}"
 
 volumes:
   postgres_data:

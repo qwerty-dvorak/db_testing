@@ -11,8 +11,8 @@ Connects via psycopg -- no psql binary required.
 
 Usage:
     uv run python setup_db.py
-    uv run python setup_db.py --pgdata /var/pgdata
-    uv run python setup_db.py --no-start --rows 1000
+    uv run python setup_db.py --pgdata .pgdata
+    uv run python setup_db.py --no-start --no-reset --rows 1000
 """
 
 from __future__ import annotations
@@ -98,8 +98,9 @@ def main() -> None:
         description="Set up project_db for high-dimensional sensor data",
     )
     parser.add_argument(
-        "--pgdata", default="/tmp/pgdata",
-        help="PostgreSQL data directory (default: /tmp/pgdata)",
+        "--pgdata",
+        default=".pgdata",
+        help="PostgreSQL data directory (default: .pgdata)",
     )
     parser.add_argument(
         "--host", default=os.getenv("PGHOST", "/tmp"),
@@ -123,6 +124,12 @@ def main() -> None:
     parser.add_argument(
         "--rows", type=int, default=100,
         help="Number of sample rows to insert (default: 100)",
+    )
+    parser.add_argument(
+        "--reset",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Drop and recreate sensor_payloads before setup (default: true)",
     )
     parser.add_argument(
         "--analytics",
@@ -150,14 +157,18 @@ def main() -> None:
     conn = get_conn(args.host, args.port, args.db)
 
     print("\n[1/4] Creating schema ...")
-    drop_table(conn)
+    if args.reset:
+        drop_table(conn)
     create_table(conn)
 
     print("[2/4] Installing custom aggregates ...")
     install_aggregates(conn)
 
     print(f"[3/4] Generating {args.rows} sample rows ...")
-    generate_samples(conn, n_rows=args.rows)
+    if args.rows > 0:
+        generate_samples(conn, n_rows=args.rows)
+    else:
+        print("  Skipped sample generation")
 
     print("[4/4] Verification ...")
     report = verify_all(conn)

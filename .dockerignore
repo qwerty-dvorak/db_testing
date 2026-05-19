@@ -1,5 +1,7 @@
 .git
 .venv
+.uv-cache
+.pgdata
 __pycache__
 *.pyc
 *.pyo

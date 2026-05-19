@@ -7,15 +7,23 @@ Benchmarking framework for storing and querying **1024-channel floating-point se
 ### Docker
 
 ```bash
-# Build the Python 3.10 app image, start PostgreSQL 14, and initialise data
-docker compose up --build app
+# Start persistent PostgreSQL 14 on host port 5433
+docker compose up -d db
 
-# Run CLI commands against the persisted PostgreSQL volume
-docker compose run --rm app python main.py status
-docker compose run --rm app python main.py benchmark --iterations 5
+# Initialise schema/aggregates without deleting existing data
+docker compose run --rm setup
+
+# Append 10,000 generated rows using the bulk insert path
+docker compose run --rm seed
+
+# Run CLI commands through uv inside Docker
+docker compose run --rm app uv run python main.py status
+docker compose run --rm app uv run python main.py benchmark --iterations 5
 ```
 
 Database files are stored in the named Docker volume `db_testing_postgres_data`.
+PostgreSQL is exposed to the host at `localhost:5433`. See
+[Docker Guide](docs/07_docker.md) for setup, seeding, reset, and CLI workflows.
 
 ### Local
 
@@ -83,7 +91,8 @@ uv run python main.py query "SELECT count(*) FROM sensor_payloads"
     ├── 03_benchmarking.md                # EXPLAIN ANALYZE methodology
     ├── 04_custom_aggregates.md           # Aggregate API reference
     ├── 05_1024_channel_performance_plan.md # Postgres-only layout comparisons
-    └── 06_channel_analytics_layer.md     # Exact min/max and threshold analytics
+    ├── 06_channel_analytics_layer.md     # Exact min/max and threshold analytics
+    └── 07_docker.md                      # Docker, persistent storage, and seeding
 ```
 
 ## Table Schema
@@ -104,6 +113,7 @@ uv run python main.py query "SELECT count(*) FROM sensor_payloads"
 | [Custom Aggregates](docs/04_custom_aggregates.md) | State functions, parallel execution, performance |
 | [1024-Channel Plan](docs/05_1024_channel_performance_plan.md) | Postgres-only JSONB, array, normalized, and wide-table benchmarks |
 | [Channel Analytics Layer](docs/06_channel_analytics_layer.md) | Exact bucket summaries and sorted blocks for min/max and threshold counts |
+| [Docker Guide](docs/07_docker.md) | PostgreSQL 14 containers, persistent volume storage, port 5433, and bulk seeding |
 
 ## Requirements
 

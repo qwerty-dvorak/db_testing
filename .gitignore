@@ -8,3 +8,9 @@ wheels/
 
 # Virtual environments
 .venv
+
+# Local PostgreSQL data directory
+.pgdata/
+
+# Local uv cache override used by sandboxed/dev commands
+.uv-cache/

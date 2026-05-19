@@ -23,7 +23,7 @@ import sys
 from scripts.connection import get_conn, server_version
 from scripts.schema import table_exists, row_count, table_size
 from scripts.aggregates import verify_aggregates, aggregates_installed
-from scripts.sample_data import generate_samples
+from scripts.sample_data import generate_bulk, generate_samples
 from scripts.benchmark import run_benchmarks, print_results
 from scripts.verify import verify_all, print_report
 from scripts.analytics import (
@@ -67,9 +67,25 @@ def cmd_query(args: argparse.Namespace) -> None:
 
 def cmd_generate(args: argparse.Namespace) -> None:
     conn = get_conn(args.host, args.port, args.db)
-    generate_samples(conn, n_rows=args.rows, channels=args.channels)
+    if args.bulk:
+        generate_bulk(
+            conn,
+            n_rows=args.rows,
+            channels=args.channels,
+            batch_size=args.batch_size,
+        )
+    else:
+        generate_samples(
+            conn,
+            n_rows=args.rows,
+            channels=args.channels,
+            batch_size=args.batch_size,
+        )
     conn.close()
-    print(f"Done. Total rows: {row_count(get_conn(args.host, args.port, args.db)):,}")
+    conn = get_conn(args.host, args.port, args.db)
+    total_rows = row_count(conn)
+    conn.close()
+    print(f"Done. Total rows: {total_rows:,}")
 
 
 def cmd_benchmark(args: argparse.Namespace) -> None:
@@ -151,6 +167,17 @@ def main() -> None:
     g = sub.add_parser("generate", help="Generate sample sensor data")
     g.add_argument("--rows", type=int, default=100, help="Number of rows to insert")
     g.add_argument("--channels", type=int, default=1024, help="Channels per row")
+    g.add_argument(
+        "--batch-size",
+        type=int,
+        default=100,
+        help="Rows per server-side INSERT batch",
+    )
+    g.add_argument(
+        "--bulk",
+        action="store_true",
+        help="Use large server-side INSERT batches for seeding larger datasets",
+    )
 
     b = sub.add_parser("benchmark", help="Run benchmark suite")
     b.add_argument("--iterations", type=int, default=5, help="Runs per query")

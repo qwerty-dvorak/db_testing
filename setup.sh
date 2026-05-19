@@ -11,7 +11,7 @@
 # ============================================================================
 set -euo pipefail
 
-PGDATA="${PGDATA:-/tmp/pgdata}"
+PGDATA="${PGDATA:-.pgdata}"
 DB_NAME="${DB_NAME:-project_db}"
 SAMPLE_ROWS="${SAMPLE_ROWS:-100}"
 

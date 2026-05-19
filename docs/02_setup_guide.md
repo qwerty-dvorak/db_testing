@@ -12,9 +12,15 @@
 
 ```bash
 # Docker: PostgreSQL 14 with persistent volume + Python 3.10 app
-docker compose up --build app
-docker compose run --rm app python main.py status
+docker compose up -d db
+docker compose run --rm setup
+docker compose run --rm seed
+docker compose run --rm app uv run python main.py status
 ```
+
+Docker PostgreSQL is exposed at `localhost:5433` and stores data in the named
+volume `db_testing_postgres_data`. See [Docker Guide](07_docker.md) for the full
+container workflow.
 
 ```bash
 # 1 — install dependencies
@@ -33,11 +39,11 @@ uv run python main.py verify
 ### 1. Initialise and Start PostgreSQL
 
 ```bash
-# Initialise a data directory
-pg_ctl initdb -D /tmp/pgdata --no-locale --encoding=UTF8
+# Initialise a persistent data directory
+pg_ctl initdb -D .pgdata --no-locale --encoding=UTF8
 
 # Start the server
-pg_ctl -D /tmp/pgdata -l /tmp/pgdata/logfile start
+pg_ctl -D .pgdata -l .pgdata/logfile start
 ```
 
 ### 2. Create the Database
@@ -93,6 +99,9 @@ uv run python main.py benchmark --iterations 5
 # Generate 1,000 rows of test data with 1024 channels each
 uv run python main.py generate --rows 1000 --channels 1024
 
+# Generate larger seed data with server-side bulk INSERT batches
+uv run python main.py generate --bulk --rows 10000 --channels 1024 --batch-size 10000
+
 # Run an ad-hoc query
 uv run python main.py query "SELECT count(*) FROM sensor_payloads"
 
@@ -105,10 +114,10 @@ uv run python main.py verify
 **PostgreSQL won't start:**
 ```bash
 # Check the log
-cat /tmp/pgdata/logfile | tail -20
+tail -20 .pgdata/logfile
 
 # Ensure no stale PID file
-rm -f /tmp/pgdata/postmaster.pid
+rm -f .pgdata/postmaster.pid
 ```
 
 **psql not found:**
