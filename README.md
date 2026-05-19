@@ -81,7 +81,9 @@ avg/min/median/max/stdev, and total measured query time.
     ├── 02_setup_guide.md
     ├── 03_benchmarking.md
     ├── 04_docker.md
-    └── 05_1024_channel_performance_plan.md
+    ├── 05_1024_channel_performance_plan.md
+    ├── 06_fresh_vm_runbook.md
+    └── 07_possible_optimisations.md
 ```
 
 ## Docs
@@ -93,6 +95,8 @@ avg/min/median/max/stdev, and total measured query time.
 | [Benchmarking](docs/03_benchmarking.md) | Query groups, timing output, plan inspection |
 | [Docker](docs/04_docker.md) | Compose services, port 5433, volume reset |
 | [Layout Reference](docs/05_1024_channel_performance_plan.md) | Schema shapes and tradeoffs |
+| [Fresh VM Runbook](docs/06_fresh_vm_runbook.md) | Start from a clean VM and run setup, seed, verify, benchmark |
+| [Possible Optimisations](docs/07_possible_optimisations.md) | Ingestion, schema, query, PostgreSQL, and harness improvements |
 
 ## Requirements
 
