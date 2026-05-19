@@ -112,57 +112,6 @@ FROM sensor_seed_values
 GROUP BY reading_id, created_at
 """
 
-
-def _wide_sync_sql(channels: int = CHANNEL_COUNT) -> str:
-    names = ", ".join(f"ch{i:04d}" for i in range(1, channels + 1))
-    values = ", ".join(
-        f"(src.payload->>{i - 1})::float8 AS ch{i:04d}"
-        for i in range(1, channels + 1)
-    )
-    return f"""
-INSERT INTO sensor_payloads_wide (id, created_at, {names})
-SELECT src.id, src.created_at, {values}
-FROM sensor_payloads AS src
-WHERE NOT EXISTS (
-    SELECT 1 FROM sensor_payloads_wide AS dst WHERE dst.id = src.id
-)
-"""
-
-
-SYNC_JSONB_OBJECT_SQL = """
-INSERT INTO sensor_payloads_json_object (id, payload, created_at)
-SELECT
-    src.id,
-    jsonb_object_agg(
-        'ch' || lpad(ord::text, 4, '0'),
-        value
-        ORDER BY ord
-    ) AS payload,
-    src.created_at
-FROM sensor_payloads AS src
-CROSS JOIN LATERAL jsonb_array_elements(src.payload) WITH ORDINALITY AS e(value, ord)
-WHERE NOT EXISTS (
-    SELECT 1 FROM sensor_payloads_json_object AS dst WHERE dst.id = src.id
-)
-GROUP BY src.id, src.created_at
-"""
-
-SYNC_ARRAY_SQL = """
-INSERT INTO sensor_payloads_array (id, payload, created_at)
-SELECT
-    src.id,
-    array_agg(value::float8 ORDER BY ord) AS payload,
-    src.created_at
-FROM sensor_payloads AS src
-CROSS JOIN LATERAL jsonb_array_elements_text(src.payload)
-    WITH ORDINALITY AS e(value, ord)
-WHERE NOT EXISTS (
-    SELECT 1 FROM sensor_payloads_array AS dst WHERE dst.id = src.id
-)
-GROUP BY src.id, src.created_at
-"""
-
-
 def _require_supported_channels(channels: int) -> None:
     if channels != CHANNEL_COUNT:
         raise ValueError(
@@ -210,30 +159,6 @@ def _insert_batch(
     )
     _timed_execute(conn, "insert real[] rows", INSERT_ARRAY_SQL, verbose=verbose)
     _timed_execute(conn, "insert wide rows", _wide_insert_sql(channels), verbose=verbose)
-
-
-def sync_layouts_from_jsonb(
-    conn: psycopg.Connection,
-    channels: int = CHANNEL_COUNT,
-    verbose: bool = True,
-) -> None:
-    """Backfill missing non-array layouts from existing JSONB-array rows."""
-    _require_supported_channels(channels)
-    if verbose:
-        print("[sync] Backfilling missing layout rows from sensor_payloads ...")
-    _timed_execute(
-        conn,
-        "sync JSONB key-value rows",
-        SYNC_JSONB_OBJECT_SQL,
-        verbose=verbose,
-    )
-    _timed_execute(conn, "sync real[] rows", SYNC_ARRAY_SQL, verbose=verbose)
-    _timed_execute(conn, "sync wide rows", _wide_sync_sql(channels), verbose=verbose)
-    t0 = time.perf_counter()
-    conn.commit()
-    commit_ms = (time.perf_counter() - t0) * 1000
-    if verbose:
-        print(f"    sync commit{'':<21s} {commit_ms:>10.1f} ms")
 
 
 def generate_samples(

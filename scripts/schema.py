@@ -93,53 +93,18 @@ COMMENT ON TABLE sensor_payloads_json_object IS
 COMMENT ON TABLE sensor_payloads_array IS
     'High-dimensional sensor telemetry -- native real[] payloads';
 COMMENT ON TABLE sensor_payloads_wide IS
-    'High-dimensional sensor telemetry -- one float8 column per channel';
+    'High-dimensional sensor telemetry -- one real column per channel';
 COMMENT ON COLUMN sensor_payloads.id IS
     'UUID v4, generated via gen_random_uuid()';
 COMMENT ON COLUMN sensor_payloads.payload IS
-    'JSONB array of 1024 float8 values: [0.123, 0.456, ...]';
+    'JSONB array of 1024 numeric channel values: [0.123, 0.456, ...]';
 COMMENT ON COLUMN sensor_payloads.created_at IS
     'Ingestion timestamp with timezone';
 """
 
 
-def ensure_compatible_layouts(conn: psycopg.Connection) -> None:
-    """Drop derived layout tables when an older incompatible type is present."""
-    checks = [
-        (
-            "sensor_payloads_array",
-            """
-            SELECT udt_name
-            FROM information_schema.columns
-            WHERE table_schema = 'public'
-              AND table_name = 'sensor_payloads_array'
-              AND column_name = 'payload'
-            """,
-            "_float4",
-        ),
-        (
-            "sensor_payloads_wide",
-            """
-            SELECT udt_name
-            FROM information_schema.columns
-            WHERE table_schema = 'public'
-              AND table_name = 'sensor_payloads_wide'
-              AND column_name = 'ch0001'
-            """,
-            "float4",
-        ),
-    ]
-    for table, query, expected_udt in checks:
-        cur = conn.execute(query)
-        row = cur.fetchone()
-        if row is not None and row[0] != expected_udt:
-            conn.execute(f"DROP TABLE IF EXISTS {table} CASCADE")
-    conn.commit()
-
-
 def create_table(conn: psycopg.Connection) -> None:
     """Create all sensor payload layout tables with indexes and comments."""
-    ensure_compatible_layouts(conn)
     conn.execute(CREATE_JSONB_ARRAY_SQL)
     conn.execute(CREATE_JSONB_OBJECT_SQL)
     conn.execute(CREATE_ARRAY_SQL)

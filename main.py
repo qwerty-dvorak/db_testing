@@ -18,11 +18,9 @@ from __future__ import annotations
 
 import argparse
 import os
-import sys
 
 from scripts.connection import get_conn, server_version
 from scripts.schema import layout_stats, table_exists, row_count, table_size
-from scripts.aggregates import verify_aggregates, aggregates_installed
 from scripts.sample_data import generate_bulk, generate_samples
 from scripts.benchmark import run_benchmarks, print_results
 from scripts.verify import verify_all, print_report
@@ -32,10 +30,9 @@ def cmd_status(args: argparse.Namespace) -> None:
     conn = get_conn(args.host, args.port, args.db)
     print(f"Database: {args.db}")
     print(f"Version:  PostgreSQL {server_version(conn)}")
-    print(f"Table:    {'exists' if table_exists(conn) else 'missing'}")
+    print(f"Schema:   {'complete' if table_exists(conn) else 'missing'}")
     print(f"Rows:     {row_count(conn):,}")
     print(f"Size:     {table_size(conn)}")
-    print(f"Aggregates: {'installed' if aggregates_installed(conn) else 'missing'}")
     print("Layouts:")
     try:
         for stat in layout_stats(conn):

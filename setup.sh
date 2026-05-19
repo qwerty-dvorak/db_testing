@@ -4,10 +4,9 @@
 #
 #   1. Starts PostgreSQL (if not running)
 #   2. Creates the project_db database
-#   3. Creates the sensor_payloads table
-#   4. Installs custom aggregate functions
-#   5. Inserts sample data
-#   6. Runs verification
+#   3. Creates the four layout tables
+#   4. Inserts sample data
+#   5. Runs verification
 # ============================================================================
 set -euo pipefail
 

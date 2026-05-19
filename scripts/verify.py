@@ -16,12 +16,14 @@ from typing import Any
 
 import psycopg
 
+from scripts.schema import LAYOUT_TABLES
+
 
 @dataclass
 class VerificationReport:
     """Structured output from verify_all()."""
 
-    table_exists: bool = False
+    schema_exists: bool = False
     row_count: int = 0
     total_values: int = 0
     global_min: float = 0.0
@@ -29,7 +31,6 @@ class VerificationReport:
     global_sum: float = 0.0
     table_size: str = "unknown"
     index_count: int = 0
-    aggregates_ok: bool = False
     layout_counts: dict[str, int] = field(default_factory=dict)
     layout_sizes: dict[str, str] = field(default_factory=dict)
     sample_rows: list[dict[str, Any]] = field(default_factory=list)
@@ -41,17 +42,21 @@ def verify_all(conn: psycopg.Connection) -> VerificationReport:
     report = VerificationReport()
 
     try:
-        # Table existence
         cur = conn.execute(
-            "SELECT 1 FROM information_schema.tables "
-            "WHERE table_schema = 'public' AND table_name = 'sensor_payloads'",
+            """
+            SELECT count(*)
+            FROM information_schema.tables
+            WHERE table_schema = 'public'
+              AND table_name = ANY(%s)
+            """,
+            (LAYOUT_TABLES,),
         )
-        report.table_exists = cur.fetchone() is not None
+        report.schema_exists = cur.fetchone()[0] == len(LAYOUT_TABLES)
     except Exception as e:
         report.errors.append(f"table check: {e}")
         conn.rollback()
 
-    if not report.table_exists:
+    if not report.schema_exists:
         return report
 
     try:
@@ -79,12 +84,7 @@ def verify_all(conn: psycopg.Connection) -> VerificationReport:
         report.errors.append(f"index count: {e}")
         conn.rollback()
 
-    for table in [
-        "sensor_payloads",
-        "sensor_payloads_json_object",
-        "sensor_payloads_array",
-        "sensor_payloads_wide",
-    ]:
+    for table in LAYOUT_TABLES:
         try:
             cur = conn.execute(f"SELECT count(*) FROM {table}")
             report.layout_counts[table] = int(cur.fetchone()[0])
@@ -102,26 +102,16 @@ def verify_all(conn: psycopg.Connection) -> VerificationReport:
         if len(distinct_counts) > 1:
             report.errors.append(f"layout row counts differ: {report.layout_counts}")
 
-    # Aggregates
-    try:
-        cur = conn.execute(
-            "SELECT 1 FROM pg_proc WHERE proname = 'array_global_min'",
-        )
-        report.aggregates_ok = cur.fetchone() is not None
-    except Exception as e:
-        report.errors.append(f"aggregate check: {e}")
-        conn.rollback()
-
-    if report.aggregates_ok and report.row_count > 0:
+    if report.row_count > 0:
         try:
             cur = conn.execute("""
                 SELECT
-                    array_global_min(v),
-                    array_global_max(v),
-                    array_global_sum(v),
-                    array_global_count(v)
-                FROM sensor_payloads,
-                LATERAL jsonb_array_to_float8(payload) AS v
+                    min(value),
+                    max(value),
+                    sum(value),
+                    count(value)
+                FROM sensor_payloads_array,
+                LATERAL unnest(payload) AS u(value)
             """)
             r = cur.fetchone()
             report.global_min = float(r[0])
@@ -129,7 +119,7 @@ def verify_all(conn: psycopg.Connection) -> VerificationReport:
             report.global_sum = float(r[2])
             report.total_values = int(r[3])
         except Exception as e:
-            report.errors.append(f"aggregate query: {e}")
+            report.errors.append(f"global stats query: {e}")
             conn.rollback()
 
     try:
@@ -158,18 +148,17 @@ def print_report(report: VerificationReport) -> None:
     print("  Verification Report")
     print(line)
 
-    if not report.table_exists:
-        print("  [WARN] sensor_payloads table does not exist")
+    if not report.schema_exists:
+        print("  [WARN] four-layout schema is incomplete")
         return
 
-    print(f"  Table exists:          {report.table_exists}")
+    print(f"  Schema exists:         {report.schema_exists}")
     print(f"  Row count:             {report.row_count:,}")
     print(f"  Total float values:    {report.total_values:,}")
     print(f"  Table size:            {report.table_size}")
     print(f"  Indexes:               {report.index_count}")
     print(f"  Global min:            {report.global_min:.6f}")
     print(f"  Global max:            {report.global_max:.6f}")
-    print(f"  Aggregates installed:  {report.aggregates_ok}")
 
     if report.layout_counts:
         print("  Layouts:")

@@ -7,7 +7,7 @@ Compares:
 - Wide table: sensor_payloads_wide
 
 All analytical work is done inside the timed query. There is no separate
-analytics build step.
+precompute step.
 """
 
 from __future__ import annotations

@@ -20,17 +20,14 @@ from __future__ import annotations
 import argparse
 import os
 import subprocess
-import sys
 import time
 from pathlib import Path
 
-import psycopg
 from psycopg import sql
 
-from scripts.connection import connstr, get_conn
+from scripts.connection import get_conn
 from scripts.schema import create_table, drop_table
-from scripts.aggregates import install_aggregates
-from scripts.sample_data import generate_samples, sync_layouts_from_jsonb
+from scripts.sample_data import generate_samples
 from scripts.verify import verify_all, print_report
 
 
@@ -128,7 +125,7 @@ def main() -> None:
         "--reset",
         action=argparse.BooleanOptionalAction,
         default=True,
-        help="Drop and recreate sensor_payloads before setup (default: true)",
+        help="Drop and recreate the four layout tables before setup",
     )
     args = parser.parse_args()
 
@@ -144,9 +141,7 @@ def main() -> None:
         drop_table(conn)
     create_table(conn)
 
-    print("[2/4] Installing custom aggregates ...")
-    install_aggregates(conn)
-    sync_layouts_from_jsonb(conn)
+    print("[2/4] Schema ready")
 
     print(f"[3/4] Generating {args.rows} sample rows ...")
     if args.rows > 0:

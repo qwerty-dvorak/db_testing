@@ -1,104 +1,43 @@
-# Architecture Overview — High-Dimensional Sensor Data in PostgreSQL
+# Architecture Overview
 
-## Problem Statement
+This project benchmarks 1024-channel sensor readings in PostgreSQL using four
+physical layouts. Each generated reading is written to every layout with the
+same `id`, `created_at`, and channel values.
 
-A single sensor payload consists of **1024 discrete floating-point channels** (4-byte `float4` or 8-byte `float8`). At a scale of **1 million rows**, the raw uncompressed data footprint alone approaches several gigabytes — before accounting for MVCC overhead, indexing, and transaction metadata.
+## Layouts
 
-## Storage Layouts Compared
+| Table | Shape | Notes |
+|-------|-------|-------|
+| `sensor_payloads` | JSONB array | Compact API shape, but every analytical query extracts and casts JSONB values |
+| `sensor_payloads_json_object` | JSONB object with `ch0001` ... `ch1024` keys | Self-describing payload, larger than the array because every row repeats keys |
+| `sensor_payloads_array` | `real[]` | Typed positional array; still TOASTed, but avoids JSONB parsing/casts |
+| `sensor_payloads_wide` | 1024 `real` columns | Direct column reads; rigid schema; viable with `real`, not `float8`, because 1024 `float8` columns exceed PostgreSQL row-size limits |
 
-### 1. JSONB Storage (Implemented Here)
+## Why `real` For Typed Layouts
 
-The `sensor_payloads` table uses a **JSONB column** for the payload. JSONB stores data in a binary, tree-encoded format that:
+PostgreSQL heap rows must fit on an 8 KB page before TOAST can help. A wide
+table with 1024 `float8` columns needs at least 8192 bytes for channel values
+before tuple overhead, so inserts fail with a row-size error. The typed array
+and wide-table layouts use `real` (`float4`) to keep the 1024-column wide table
+valid while preserving a direct native-float comparison against JSONB layouts.
 
-- Eliminates re-parsing on every read (unlike plain `JSON`)
-- Supports GIN indexing (`jsonb_path_ops`)
-- Enables flexible schema evolution
+## Real-Time Analysis
 
-**The TOAST bottleneck:** A 1024-element `float8` array consumes ~8.0 KB, immediately exceeding the 2 KB tuple threshold. PostgreSQL's TOAST (The Oversized-Attribute Storage Technique) transparently:
+There are no summary tables or precomputed analysis builds in the CLI.
+Benchmarks run the actual query work:
 
-1. Compresses the JSONB payload
-2. Moves it to an out-of-line side table
-3. Stores only a pointer (OID) in the main 8 KB heap page
+- single-channel min/max/avg
+- all-channel min/max
+- all-channel threshold counts
+- row counts
 
-Every analytical query forces a **Decompress → Modify → Compress** cycle across potentially millions of rows.
+Timing includes extraction, casts, unnesting, grouping, threshold checks, and
+result fetches.
 
-### 2. Native PostgreSQL Arrays (`float8[]`)
+## Storage Expectations
 
-| Property          | JSONB                     | Native Array              |
-|-------------------|---------------------------|---------------------------|
-| Type safety       | Dynamic (cast required)   | Strongly typed            |
-| TOAST trigger     | Always (≥2 KB)            | Always (≥2 KB)            |
-| Indexing          | GIN with `jsonb_path_ops` | GIN with array ops        |
-| Planner stats     | Poor (opaque tree)        | Better (element histograms) |
-| Write amplification| Low (single column)       | High under GIN (N entries per row) |
-
-### 3. Normalised (EAV) Model
-
-Transforms columns into rows: 1 payload → 1024 rows.
-
-- **Pro:** Avoids TOAST entirely
-- **Con:** 1 million payloads → 1.024 billion rows → ~23 GB of tuple header overhead alone
-
-### 4. Wide Table Model
-
-1024 discrete `float8` columns.
-
-- **Pro:** No TOAST for single-channel queries; columnar I/O
-- **Con:** Hard limit of 1600 columns; brittle schema; massive null bitmap overhead
-
-## Physical Storage Architecture (PostgreSQL 18)
-
-```
-Heap Page (8 KB)
-┌──────────────────────────────┐
-│  PageHeaderData  (24 B)      │
-│  ┌──────────────────────────┐│
-│  │ Tuple 1:                 ││
-│  │  │ id (UUID, 16 B)      ││
-│  │  │ payload (varlena) ────│────→ TOAST table (compressed)
-│  │  │ created_at (8 B)     ││
-│  │  └──────────────────────┘│
-│  │ Tuple 2: ...             │
-│  └──────────────────────────┘
-│  Special space               │
-└──────────────────────────────┘
-```
-
-When `payload` exceeds 2 KB, it is compressed and stored in the `pg_toast` schema. The main tuple retains a 4-byte OID pointer.
-
-## Memory Context Hierarchy
-
-PostgreSQL manages memory in a hierarchical context tree:
-
-```
-TopMemoryContext
-├── PostmasterContext
-├── CacheMemoryContext        (catalog cache — persists across queries)
-├── MessageContext
-├── TopTransactionContext
-│   └── TransactionContext
-├── PortalContext
-│   └── ExecutorState         (per-query execution)
-│       ├── ExprContext
-│       ├── TupleSort         (sort/aggregation ops — spills if > work_mem)
-│       └── AggContext
-└── ErrorContext
-```
-
-Key monitoring query (PostgreSQL 14+):
-
-```sql
-SELECT name, ident, type, parent, total_bytes, free_bytes, used_bytes
-FROM pg_backend_memory_contexts
-ORDER BY total_bytes DESC;
-```
-
-## Key Configuration Parameters
-
-| Parameter       | Default | Recommended (this workload) | Rationale                          |
-|-----------------|---------|-----------------------------|-------------------------------------|
-| `work_mem`      | 4 MB    | 256–512 MB                  | Avoid external merge disk spills    |
-| `shared_buffers`| 128 MB  | 25% of RAM                  | Cache frequently accessed pages     |
-| `jit`           | on      | off (benchmarking)          | Eliminate JIT compilation overhead  |
-| `maintenance_work_mem` | 64 MB | 1 GB                 | Speed up VACUUM and index creation  |
-| `effective_cache_size` | 4 GB | 75% of RAM             | Help planner estimate index scans   |
+JSONB object storage is usually largest because each row stores 1024 repeated
+key names. JSONB array avoids repeated keys but still has JSONB encoding and
+TOAST overhead. `real[]` is usually the smallest typed layout. Wide rows can be
+fast for single-column scans and threshold counts, but all-channel min/max uses
+a generated lateral `VALUES` query to return one row per channel.

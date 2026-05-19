@@ -1,76 +1,66 @@
-# Setup Guide — project_db
+# Setup Guide
 
-## Prerequisites
+## Requirements
 
-| Dependency      | Minimum Version | Check Command                 |
-|-----------------|-----------------|-------------------------------|
-| PostgreSQL      | 14 (18 tested)  | `pg_config --version`         |
-| Python          | 3.10            | `python3 --version`           |
-| uv              | 0.5+            | `uv --version`                |
+| Dependency | Version |
+|------------|---------|
+| PostgreSQL | 14+ |
+| Python | 3.10+ |
+| uv | 0.5+ |
+| Docker | Optional, for the container workflow |
 
-## Quick Start
+Use `uv` for all Python commands.
+
+## Local Setup
 
 ```bash
-# Docker: PostgreSQL 14 with persistent volume + Python 3.10 app
+uv sync
+./setup.sh
+uv run python main.py status
+uv run python main.py verify
+```
+
+`setup.sh` stores local PostgreSQL data in `.pgdata` by default. The directory
+is ignored by Git.
+
+Manual equivalent:
+
+```bash
+uv run python setup_db.py --pgdata .pgdata --rows 100
+```
+
+For an already-running PostgreSQL server:
+
+```bash
+PGHOST=/tmp PGPORT=5432 PGDATABASE=project_db uv run python setup_db.py --no-start
+```
+
+## Docker Setup
+
+```bash
 docker compose up -d db
 docker compose run --rm setup
 docker compose run --rm seed
 docker compose run --rm app uv run python main.py status
 ```
 
-Docker PostgreSQL is exposed at `localhost:5433` and stores data in the named
-volume `db_testing_postgres_data`. See [Docker Guide](07_docker.md) for the full
-container workflow.
+Docker PostgreSQL listens on host port `5433` and stores data in the
+`db_testing_postgres_data` volume. See [Docker](04_docker.md).
+
+## CLI Commands
 
 ```bash
-# 1 — install dependencies
-uv sync
-
-# 2 — set up the database, schema, test data, and aggregates
-./setup.sh
-
-# 3 — verify
 uv run python main.py status
 uv run python main.py verify
+uv run python main.py generate --rows 1000 --channels 1024
+uv run python main.py generate --bulk --rows 10000 --channels 1024 --batch-size 10000
+uv run python main.py benchmark --iterations 5 --warmup 2 --threshold 50
+uv run python main.py query "SELECT count(*) FROM sensor_payloads"
 ```
 
-## Manual Step-by-Step
+## Schema
 
-### 1. Initialise and Start PostgreSQL
-
-```bash
-# Initialise a persistent data directory
-pg_ctl initdb -D .pgdata --no-locale --encoding=UTF8
-
-# Start the server
-pg_ctl -D .pgdata -l .pgdata/logfile start
-```
-
-### 2. Create the Database
-
-```bash
-# Via psycopg (recommended — no psql binary needed)
-uv run python -c "
-import psycopg
-conn = psycopg.connect('host=/tmp dbname=postgres')
-conn.autocommit = True
-conn.execute('CREATE DATABASE project_db')
-conn.close()
-"
-
-# Or via psql if available
-psql -h /tmp -d postgres -c "CREATE DATABASE project_db;"
-```
-
-### 3. Apply Schema and Aggregates
-
-```bash
-uv run python setup_db.py --no-start
-```
-
-## Table Schema
-
-Setup creates four physical layouts with identical readings:
+Setup creates four tables:
 
 | Table | Payload shape |
 |-------|---------------|
@@ -79,68 +69,24 @@ Setup creates four physical layouts with identical readings:
 | `sensor_payloads_array` | Native `real[]` |
 | `sensor_payloads_wide` | Columns `ch0001 real` through `ch1024 real` |
 
-## Custom Aggregate Functions
+`generate` appends the same generated readings to all four tables. `setup_db.py`
+uses `--reset` by default, which drops and recreates the current four-layout
+schema. Use `--no-reset` only when you intentionally want to keep existing rows
+and the existing schema already matches the current code.
 
-| Function              | Description                                      |
-|-----------------------|--------------------------------------------------|
-| `jsonb_array_to_float8(j JSONB)` | Set-returning: extracts all floats from a JSONB array |
-| `array_global_min(FLOAT8)`       | Minimum value across all unnested rows           |
-| `array_global_max(FLOAT8)`       | Maximum value across all unnested rows           |
-| `array_global_sum(FLOAT8)`       | Running sum (parallel-safe)                      |
-| `array_global_count(FLOAT8)`     | Running count (parallel-safe)                    |
-| `jsonb_array_avg(j JSONB)`       | Average of all floats in a single JSONB array    |
-| `extract_channel(j JSONB, idx)`  | Extract a specific channel by 0-based index      |
+## Resetting Data
 
-## Benchmarking
+Local:
 
 ```bash
-# Run 5 timed iterations of each real-time layout benchmark query
-uv run python main.py benchmark --iterations 5 --warmup 2 --threshold 50
-
-# Generate 1,000 rows of test data with 1024 channels each
-uv run python main.py generate --rows 1000 --channels 1024
-
-# Generate larger seed data with server-side bulk INSERT batches
-uv run python main.py generate --bulk --rows 10000 --channels 1024 --batch-size 10000
-
-# Run an ad-hoc query
-uv run python main.py query "SELECT count(*) FROM sensor_payloads"
-
-# Full verification report
-uv run python main.py verify
+rm -rf .pgdata
+./setup.sh
 ```
 
-## Troubleshooting
+Docker:
 
-**PostgreSQL won't start:**
 ```bash
-# Check the log
-tail -20 .pgdata/logfile
-
-# Ensure no stale PID file
-rm -f .pgdata/postmaster.pid
-```
-
-**psql not found:**
-```bash
-# Void Linux
-sudo xbps-install postgresql18-client
-
-# Or use pgcli as fallback
-pip install pgcli
-```
-
-**Socket connection fails:**
-```bash
-# Find the socket
-ls /tmp/.s.PGSQL.*
-# Connect explicitly
-psql -h /tmp -d project_db
-```
-
-**TOAST-related performance:**
-```sql
--- Check TOAST table size
-SELECT relname, pg_size_pretty(pg_total_relation_size(oid))
-FROM pg_class WHERE reltoastrelid != 0;
+docker compose down -v
+docker compose up -d db
+docker compose run --rm setup
 ```
