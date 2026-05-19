@@ -89,14 +89,14 @@ ORDER BY key;
 
 Use this only if channel names must be self-describing inside each row. It stores repeated key names and is usually worse than JSONB arrays for fixed 1024-channel telemetry.
 
-### 3. Native `float8[]`
+### 3. Native `real[]`
 
 Schema:
 
 ```sql
 CREATE TABLE sensor_payloads_array (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    payload float8[] NOT NULL CHECK (array_length(payload, 1) = 1024),
+    payload real[] NOT NULL CHECK (array_length(payload, 1) = 1024),
     created_at timestamptz NOT NULL DEFAULT now()
 );
 ```
@@ -124,8 +124,8 @@ Shape:
 CREATE TABLE sensor_payloads_wide (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     created_at timestamptz NOT NULL DEFAULT now(),
-    ch0001 float8 NOT NULL,
-    ch0002 float8 NOT NULL
+    ch0001 real NOT NULL,
+    ch0002 real NOT NULL
     -- through ch1024
 );
 ```
@@ -148,7 +148,7 @@ The benchmark suite compares four layouts:
 
 1. JSONB array, because it is the current implementation and most flexible.
 2. JSONB object, because it measures the cost of named key-value payloads.
-3. Native `float8[]`, because it is the cleanest fixed-channel replacement.
+3. Native `real[]`, because it is the cleanest fixed-channel replacement.
 4. Wide table, because it establishes the fastest realistic plain-Postgres baseline for min/max across every channel.
 
 All comparison queries are real time. The CLI does not build derived summary

@@ -43,7 +43,7 @@ uv run python main.py status
 # Generate 1000 sample rows with 1024 channels each
 uv run python main.py generate --rows 1000 --channels 1024
 
-# Compare JSONB array, JSONB object, float8[], and wide-table layouts in real time
+# Compare JSONB array, JSONB object, real[], and wide-table layouts in real time
 uv run python main.py benchmark --iterations 5 --warmup 2 --threshold 50
 
 # Ad-hoc query
@@ -95,8 +95,8 @@ Every generated reading is inserted into four tables with the same `id`,
 |-------|--------|
 | `sensor_payloads` | JSONB array payload |
 | `sensor_payloads_json_object` | JSONB object payload with `ch0001` ... `ch1024` keys |
-| `sensor_payloads_array` | Native `float8[]` payload |
-| `sensor_payloads_wide` | 1024 `float8` columns |
+| `sensor_payloads_array` | Native `real[]` payload |
+| `sensor_payloads_wide` | 1024 `real` columns |
 
 ## Key Documentation
 
@@ -106,7 +106,7 @@ Every generated reading is inserted into four tables with the same `id`,
 | [Setup Guide](docs/02_setup_guide.md) | Installation, configuration, troubleshooting |
 | [Benchmarking](docs/03_benchmarking.md) | EXPLAIN ANALYZE, work_mem tuning, metrics |
 | [Custom Aggregates](docs/04_custom_aggregates.md) | State functions, parallel execution, performance |
-| [1024-Channel Plan](docs/05_1024_channel_performance_plan.md) | Real-time JSONB array, JSONB object, float8[], and wide-table benchmarks |
+| [1024-Channel Plan](docs/05_1024_channel_performance_plan.md) | Real-time JSONB array, JSONB object, `real[]`, and wide-table benchmarks |
 | [Channel Analytics Layer](docs/06_channel_analytics_layer.md) | Historical notes for the removed precomputed summary approach |
 | [Docker Guide](docs/07_docker.md) | PostgreSQL 14 containers, persistent volume storage, port 5433, and bulk seeding |
 

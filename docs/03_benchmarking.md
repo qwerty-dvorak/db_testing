@@ -193,6 +193,6 @@ uv run python main.py benchmark --iterations 10 --warmup 2 --threshold 50
 ```
 
 The layouts are JSONB array, JSONB object with `ch0001` ... `ch1024` keys,
-native `float8[]`, and a generated 1024-column wide table. The benchmark does
+native `real[]`, and a generated 1024-column wide table. The benchmark does
 not use precomputed summary tables; all min/max and threshold counts are
 computed in the timed query.

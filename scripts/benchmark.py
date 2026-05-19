@@ -3,7 +3,7 @@
 Compares:
 - JSONB array: sensor_payloads
 - JSONB key-value object: sensor_payloads_json_object
-- Native float8[]: sensor_payloads_array
+- Native real[]: sensor_payloads_array
 - Wide table: sensor_payloads_wide
 
 All analytical work is done inside the timed query. There is no separate
@@ -154,7 +154,7 @@ def build_benchmark_queries(
             "SELECT count(*) FROM sensor_payloads_json_object",
         ),
         BenchmarkQuery(
-            "float8[]",
+            "real[]",
             "count rows",
             "SELECT count(*) FROM sensor_payloads_array",
         ),
@@ -188,7 +188,7 @@ def build_benchmark_queries(
             (channel_key, channel_key, channel_key),
         ),
         BenchmarkQuery(
-            "float8[]",
+            "real[]",
             f"channel {channel_ordinal} min/max/avg",
             """
             SELECT min(payload[%s]), max(payload[%s]), avg(payload[%s])
@@ -234,7 +234,7 @@ def build_benchmark_queries(
             """,
         ),
         BenchmarkQuery(
-            "float8[]",
+            "real[]",
             "all-channel min/max",
             """
             SELECT
@@ -282,7 +282,7 @@ def build_benchmark_queries(
             (threshold,),
         ),
         BenchmarkQuery(
-            "float8[]",
+            "real[]",
             f"all-channel count > {threshold:g}",
             """
             SELECT

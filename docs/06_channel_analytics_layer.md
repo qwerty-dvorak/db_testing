@@ -17,7 +17,7 @@ The benchmark compares four physical tables populated with the same readings:
 |-------|--------|
 | `sensor_payloads` | JSONB array |
 | `sensor_payloads_json_object` | JSONB key-value object |
-| `sensor_payloads_array` | Native `float8[]` |
+| `sensor_payloads_array` | Native `real[]` |
 | `sensor_payloads_wide` | 1024 typed columns |
 
 All min/max and threshold-count analysis is performed inside the timed queries.

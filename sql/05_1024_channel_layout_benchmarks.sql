@@ -83,7 +83,7 @@ GROUP BY key
 ORDER BY key;
 
 -- ---------------------------------------------------------------------------
--- C. Native float8[] layout: one row per reading, typed array payload.
+-- C. Native real[] layout: one row per reading, typed array payload.
 -- Usually the best drop-in replacement for JSONB when channels are numeric
 -- and positional. Still TOASTed, but avoids JSONB scalar text conversion.
 -- ---------------------------------------------------------------------------
@@ -91,14 +91,14 @@ ORDER BY key;
 DROP TABLE IF EXISTS sensor_payloads_array;
 CREATE TABLE sensor_payloads_array (
     id         uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    payload    float8[] NOT NULL CHECK (array_length(payload, 1) = 1024),
+    payload    real[] NOT NULL CHECK (array_length(payload, 1) = 1024),
     created_at timestamptz NOT NULL DEFAULT now()
 );
 
 INSERT INTO sensor_payloads_array (id, payload, created_at)
 SELECT
     id,
-    array_agg(value::float8 ORDER BY ord),
+    array_agg(value::real ORDER BY ord),
     created_at
 FROM sensor_payloads
 CROSS JOIN LATERAL jsonb_array_elements_text(payload) WITH ORDINALITY AS e(value, ord)
@@ -140,7 +140,7 @@ DECLARE
     channel_values text;
 BEGIN
     SELECT
-        string_agg('ch' || lpad(i::text, 4, '0') || ' float8 NOT NULL', ', ' ORDER BY i),
+        string_agg('ch' || lpad(i::text, 4, '0') || ' real NOT NULL', ', ' ORDER BY i),
         string_agg('ch' || lpad(i::text, 4, '0'), ', ' ORDER BY i),
         string_agg(format('(payload->>%s)::float8', i - 1), ', ' ORDER BY i)
     INTO channel_defs, channel_names, channel_values

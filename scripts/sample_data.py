@@ -27,7 +27,7 @@ CREATE TEMP TABLE IF NOT EXISTS sensor_seed_values (
     created_at  TIMESTAMPTZ NOT NULL,
     row_idx     INT NOT NULL,
     channel_idx INT NOT NULL,
-    value       FLOAT8 NOT NULL
+    value       REAL NOT NULL
 ) ON COMMIT PRESERVE ROWS
 """
 
@@ -56,7 +56,7 @@ SELECT
             )::numeric,
             6
         )
-    )::float8 AS value
+    )::real AS value
 FROM readings AS r
 CROSS JOIN generate_series(0, %(channels)s - 1) AS ch(channel_idx)
 """
@@ -208,7 +208,7 @@ def _insert_batch(
         INSERT_JSONB_OBJECT_SQL,
         verbose=verbose,
     )
-    _timed_execute(conn, "insert float8[] rows", INSERT_ARRAY_SQL, verbose=verbose)
+    _timed_execute(conn, "insert real[] rows", INSERT_ARRAY_SQL, verbose=verbose)
     _timed_execute(conn, "insert wide rows", _wide_insert_sql(channels), verbose=verbose)
 
 
@@ -227,7 +227,7 @@ def sync_layouts_from_jsonb(
         SYNC_JSONB_OBJECT_SQL,
         verbose=verbose,
     )
-    _timed_execute(conn, "sync float8[] rows", SYNC_ARRAY_SQL, verbose=verbose)
+    _timed_execute(conn, "sync real[] rows", SYNC_ARRAY_SQL, verbose=verbose)
     _timed_execute(conn, "sync wide rows", _wide_sync_sql(channels), verbose=verbose)
     t0 = time.perf_counter()
     conn.commit()

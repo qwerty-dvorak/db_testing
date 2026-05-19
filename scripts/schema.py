@@ -26,7 +26,7 @@ LAYOUT_TABLES = [
 
 def _wide_channel_defs(channels: int = CHANNEL_COUNT) -> str:
     return ",\n    ".join(
-        f"ch{i:04d} FLOAT8 NOT NULL" for i in range(1, channels + 1)
+        f"ch{i:04d} REAL NOT NULL" for i in range(1, channels + 1)
     )
 
 
@@ -49,7 +49,7 @@ CREATE TABLE IF NOT EXISTS sensor_payloads_json_object (
 CREATE_ARRAY_SQL = """
 CREATE TABLE IF NOT EXISTS sensor_payloads_array (
     id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    payload    FLOAT8[] NOT NULL CHECK (array_length(payload, 1) = 1024),
+    payload    REAL[] NOT NULL CHECK (array_length(payload, 1) = 1024),
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 )
 """
@@ -91,7 +91,7 @@ COMMENT ON TABLE sensor_payloads IS
 COMMENT ON TABLE sensor_payloads_json_object IS
     'High-dimensional sensor telemetry -- 1024 named-channel JSONB objects';
 COMMENT ON TABLE sensor_payloads_array IS
-    'High-dimensional sensor telemetry -- native float8[] payloads';
+    'High-dimensional sensor telemetry -- native real[] payloads';
 COMMENT ON TABLE sensor_payloads_wide IS
     'High-dimensional sensor telemetry -- one float8 column per channel';
 COMMENT ON COLUMN sensor_payloads.id IS
@@ -103,8 +103,43 @@ COMMENT ON COLUMN sensor_payloads.created_at IS
 """
 
 
+def ensure_compatible_layouts(conn: psycopg.Connection) -> None:
+    """Drop derived layout tables when an older incompatible type is present."""
+    checks = [
+        (
+            "sensor_payloads_array",
+            """
+            SELECT udt_name
+            FROM information_schema.columns
+            WHERE table_schema = 'public'
+              AND table_name = 'sensor_payloads_array'
+              AND column_name = 'payload'
+            """,
+            "_float4",
+        ),
+        (
+            "sensor_payloads_wide",
+            """
+            SELECT udt_name
+            FROM information_schema.columns
+            WHERE table_schema = 'public'
+              AND table_name = 'sensor_payloads_wide'
+              AND column_name = 'ch0001'
+            """,
+            "float4",
+        ),
+    ]
+    for table, query, expected_udt in checks:
+        cur = conn.execute(query)
+        row = cur.fetchone()
+        if row is not None and row[0] != expected_udt:
+            conn.execute(f"DROP TABLE IF EXISTS {table} CASCADE")
+    conn.commit()
+
+
 def create_table(conn: psycopg.Connection) -> None:
     """Create all sensor payload layout tables with indexes and comments."""
+    ensure_compatible_layouts(conn)
     conn.execute(CREATE_JSONB_ARRAY_SQL)
     conn.execute(CREATE_JSONB_OBJECT_SQL)
     conn.execute(CREATE_ARRAY_SQL)

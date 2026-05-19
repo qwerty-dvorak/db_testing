@@ -76,8 +76,8 @@ Setup creates four physical layouts with identical readings:
 |-------|---------------|
 | `sensor_payloads` | JSONB array: `[12.3, 45.6, ...]` |
 | `sensor_payloads_json_object` | JSONB object: `{"ch0001": 12.3, ...}` |
-| `sensor_payloads_array` | Native `float8[]` |
-| `sensor_payloads_wide` | Columns `ch0001 float8` through `ch1024 float8` |
+| `sensor_payloads_array` | Native `real[]` |
+| `sensor_payloads_wide` | Columns `ch0001 real` through `ch1024 real` |
 
 ## Custom Aggregate Functions
 
