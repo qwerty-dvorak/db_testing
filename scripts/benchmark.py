@@ -79,26 +79,21 @@ class BenchmarkResult:
 
 
 def _wide_all_channel_minmax_sql(channels: int = CHANNEL_COUNT) -> str:
-    aggregates = ",\n        ".join(
-        f"min(ch{i:04d}) AS min_ch{i:04d}, max(ch{i:04d}) AS max_ch{i:04d}"
-        for i in range(1, channels + 1)
-    )
     values = ",\n        ".join(
-        f"({i - 1}, agg.min_ch{i:04d}, agg.max_ch{i:04d})"
+        f"({i - 1}, ch{i:04d})"
         for i in range(1, channels + 1)
     )
     return f"""
-    WITH agg AS (
-        SELECT
-        {aggregates}
-        FROM sensor_payloads_wide
-    )
-    SELECT channel_idx, min_value, max_value
-    FROM agg
+    SELECT
+        channel_idx,
+        min(value) AS min_value,
+        max(value) AS max_value
+    FROM sensor_payloads_wide
     CROSS JOIN LATERAL (
         VALUES
         {values}
-    ) AS v(channel_idx, min_value, max_value)
+    ) AS v(channel_idx, value)
+    GROUP BY channel_idx
     ORDER BY channel_idx
     """
 
