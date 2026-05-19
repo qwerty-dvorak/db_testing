@@ -70,7 +70,6 @@ The seed service appends rows. It does not drop or truncate the table.
 docker compose run --rm app uv run python main.py status
 docker compose run --rm app uv run python main.py verify
 docker compose run --rm app uv run python main.py benchmark --iterations 5
-docker compose run --rm app uv run python main.py analytics-build --bucket-size "1 hour"
 ```
 
 ## Local Persistent PostgreSQL

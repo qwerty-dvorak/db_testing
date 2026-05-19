@@ -70,13 +70,14 @@ uv run python setup_db.py --no-start
 
 ## Table Schema
 
-```sql
-CREATE TABLE sensor_payloads (
-    id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    payload    JSONB NOT NULL,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
-);
-```
+Setup creates four physical layouts with identical readings:
+
+| Table | Payload shape |
+|-------|---------------|
+| `sensor_payloads` | JSONB array: `[12.3, 45.6, ...]` |
+| `sensor_payloads_json_object` | JSONB object: `{"ch0001": 12.3, ...}` |
+| `sensor_payloads_array` | Native `float8[]` |
+| `sensor_payloads_wide` | Columns `ch0001 float8` through `ch1024 float8` |
 
 ## Custom Aggregate Functions
 
@@ -93,8 +94,8 @@ CREATE TABLE sensor_payloads (
 ## Benchmarking
 
 ```bash
-# Run 5 iterations of each benchmark query
-uv run python main.py benchmark --iterations 5
+# Run 5 timed iterations of each real-time layout benchmark query
+uv run python main.py benchmark --iterations 5 --warmup 2 --threshold 50
 
 # Generate 1,000 rows of test data with 1024 channels each
 uv run python main.py generate --rows 1000 --channels 1024

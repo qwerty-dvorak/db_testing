@@ -37,23 +37,14 @@ uv sync
 # Or manually:
 uv run python setup_db.py
 
-# Include exact analytics summaries during setup:
-uv run python setup_db.py --analytics --rows 1000
-
 # Status check
 uv run python main.py status
 
 # Generate 1000 sample rows with 1024 channels each
 uv run python main.py generate --rows 1000 --channels 1024
 
-# Run benchmarks
-uv run python main.py benchmark --iterations 5
-
-# Build exact summary-backed channel analytics
-uv run python main.py analytics-build --bucket-size "1 hour" --block-size 4096
-
-# Benchmark exact per-channel min/max and threshold counts
-uv run python main.py analytics-benchmark --threshold 50
+# Compare JSONB array, JSONB object, float8[], and wide-table layouts in real time
+uv run python main.py benchmark --iterations 5 --warmup 2 --threshold 50
 
 # Ad-hoc query
 uv run python main.py query "SELECT count(*) FROM sensor_payloads"
@@ -73,7 +64,7 @@ uv run python main.py query "SELECT count(*) FROM sensor_payloads"
 │   ├── aggregates.py            # Custom aggregate SQL + installer
 │   ├── sample_data.py           # Synthetic 1024-channel data generator
 │   ├── verify.py                # Verification checks + formatted report
-│   └── benchmark.py             # Timed benchmark runner
+│   └── benchmark.py             # Real-time four-layout benchmark runner
 ├── sql/
 │   ├── 01_create_table.sql              # PG 18 schema
 │   ├── 01_create_table_pg16.sql         # PG 16 schema
@@ -84,24 +75,28 @@ uv run python main.py query "SELECT count(*) FROM sensor_payloads"
 │   ├── 04_benchmark_queries.sql         # PG 18 benchmarks
 │   ├── 04_benchmark_queries_pg16.sql    # PG 16 benchmarks
 │   ├── 05_1024_channel_layout_benchmarks.sql # Postgres-only layout comparisons
-│   └── 06_channel_analytics.sql         # Exact summary/block analytics layer
+│   └── 06_channel_analytics.sql         # Historical summary/block analytics SQL
 └── docs/
     ├── 01_architecture_overview.md       # JSONB internals, TOAST, MVCC
     ├── 02_setup_guide.md                 # Installation and configuration
     ├── 03_benchmarking.md                # EXPLAIN ANALYZE methodology
     ├── 04_custom_aggregates.md           # Aggregate API reference
     ├── 05_1024_channel_performance_plan.md # Postgres-only layout comparisons
-    ├── 06_channel_analytics_layer.md     # Exact min/max and threshold analytics
+    ├── 06_channel_analytics_layer.md     # Historical summary-layer notes
     └── 07_docker.md                      # Docker, persistent storage, and seeding
 ```
 
-## Table Schema
+## Storage Layouts
 
-| Column      | Type                     | Description                       |
-|-------------|--------------------------|-----------------------------------|
-| `id`        | `UUID` (PK)              | UUID v4 (`gen_random_uuid()`)     |
-| `payload`   | `JSONB` (NOT NULL)       | 1024-element float8 array         |
-| `created_at`| `TIMESTAMPTZ`            | Ingestion timestamp               |
+Every generated reading is inserted into four tables with the same `id`,
+`created_at`, and 1024 channel values:
+
+| Table | Layout |
+|-------|--------|
+| `sensor_payloads` | JSONB array payload |
+| `sensor_payloads_json_object` | JSONB object payload with `ch0001` ... `ch1024` keys |
+| `sensor_payloads_array` | Native `float8[]` payload |
+| `sensor_payloads_wide` | 1024 `float8` columns |
 
 ## Key Documentation
 
@@ -111,8 +106,8 @@ uv run python main.py query "SELECT count(*) FROM sensor_payloads"
 | [Setup Guide](docs/02_setup_guide.md) | Installation, configuration, troubleshooting |
 | [Benchmarking](docs/03_benchmarking.md) | EXPLAIN ANALYZE, work_mem tuning, metrics |
 | [Custom Aggregates](docs/04_custom_aggregates.md) | State functions, parallel execution, performance |
-| [1024-Channel Plan](docs/05_1024_channel_performance_plan.md) | Postgres-only JSONB, array, normalized, and wide-table benchmarks |
-| [Channel Analytics Layer](docs/06_channel_analytics_layer.md) | Exact bucket summaries and sorted blocks for min/max and threshold counts |
+| [1024-Channel Plan](docs/05_1024_channel_performance_plan.md) | Real-time JSONB array, JSONB object, float8[], and wide-table benchmarks |
+| [Channel Analytics Layer](docs/06_channel_analytics_layer.md) | Historical notes for the removed precomputed summary approach |
 | [Docker Guide](docs/07_docker.md) | PostgreSQL 14 containers, persistent volume storage, port 5433, and bulk seeding |
 
 ## Requirements

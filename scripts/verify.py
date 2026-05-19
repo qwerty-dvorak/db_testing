@@ -30,6 +30,8 @@ class VerificationReport:
     table_size: str = "unknown"
     index_count: int = 0
     aggregates_ok: bool = False
+    layout_counts: dict[str, int] = field(default_factory=dict)
+    layout_sizes: dict[str, str] = field(default_factory=dict)
     sample_rows: list[dict[str, Any]] = field(default_factory=list)
     errors: list[str] = field(default_factory=list)
 
@@ -72,6 +74,28 @@ def verify_all(conn: psycopg.Connection) -> VerificationReport:
         report.index_count = cur.fetchone()[0]
     except Exception as e:
         report.errors.append(f"index count: {e}")
+
+    for table in [
+        "sensor_payloads",
+        "sensor_payloads_json_object",
+        "sensor_payloads_array",
+        "sensor_payloads_wide",
+    ]:
+        try:
+            cur = conn.execute(f"SELECT count(*) FROM {table}")
+            report.layout_counts[table] = int(cur.fetchone()[0])
+            cur = conn.execute(
+                "SELECT pg_size_pretty(pg_total_relation_size(%s::regclass))",
+                (table,),
+            )
+            report.layout_sizes[table] = str(cur.fetchone()[0])
+        except Exception as e:
+            report.errors.append(f"{table} layout check: {e}")
+
+    if report.layout_counts:
+        distinct_counts = set(report.layout_counts.values())
+        if len(distinct_counts) > 1:
+            report.errors.append(f"layout row counts differ: {report.layout_counts}")
 
     # Aggregates
     try:
@@ -138,6 +162,12 @@ def print_report(report: VerificationReport) -> None:
     print(f"  Global min:            {report.global_min:.6f}")
     print(f"  Global max:            {report.global_max:.6f}")
     print(f"  Aggregates installed:  {report.aggregates_ok}")
+
+    if report.layout_counts:
+        print("  Layouts:")
+        for table, rows in report.layout_counts.items():
+            size = report.layout_sizes.get(table, "unknown")
+            print(f"    {table:28s} rows={rows:>10,} size={size}")
 
     if report.sample_rows:
         print(f"  Sample rows:")

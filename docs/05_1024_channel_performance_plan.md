@@ -116,43 +116,7 @@ ORDER BY ord;
 
 This is the best drop-in alternative to JSONB for fixed numeric channels. It keeps one row per reading, preserves channel position, and avoids JSONB text extraction.
 
-### 4. Normalized Channel Rows
-
-Schema:
-
-```sql
-CREATE TABLE sensor_channel_values (
-    reading_id uuid NOT NULL,
-    channel_idx int2 NOT NULL CHECK (channel_idx BETWEEN 0 AND 1023),
-    value float8 NOT NULL,
-    created_at timestamptz NOT NULL,
-    PRIMARY KEY (reading_id, channel_idx)
-);
-```
-
-All-channel extrema:
-
-```sql
-SELECT
-    channel_idx,
-    min(value) AS min_value,
-    max(value) AS max_value
-FROM sensor_channel_values
-GROUP BY channel_idx
-ORDER BY channel_idx;
-```
-
-One-channel extrema:
-
-```sql
-SELECT min(value), max(value)
-FROM sensor_channel_values
-WHERE channel_idx = 511;
-```
-
-This is indexable and simple, but 1M readings become 1.024B rows. Use it when single-channel filtering dominates and storage/write volume is acceptable.
-
-### 5. Wide 1024-Column Table
+### 4. Wide 1024-Column Table
 
 Shape:
 
@@ -180,14 +144,15 @@ This is likely the fastest plain-Postgres row-store option for all-channel min/m
 
 ## Recommendation
 
-Start with three benchmarks:
+The benchmark suite compares four layouts:
 
 1. JSONB array, because it is the current implementation and most flexible.
-2. Native `float8[]`, because it is the cleanest fixed-channel replacement.
-3. Wide table, because it establishes the fastest realistic plain-Postgres baseline for min/max across every channel.
+2. JSONB object, because it measures the cost of named key-value payloads.
+3. Native `float8[]`, because it is the cleanest fixed-channel replacement.
+4. Wide table, because it establishes the fastest realistic plain-Postgres baseline for min/max across every channel.
 
-Use normalized rows only if product queries frequently ask for a small number of channels with selective time ranges. Avoid JSONB object unless named channels inside the payload are a hard requirement.
+All comparison queries are real time. The CLI does not build derived summary
+tables before benchmarking, so extraction, casts, unnesting, aggregation, and
+threshold counting are included in the measured query time.
 
 The runnable SQL for these layouts is in `sql/05_1024_channel_layout_benchmarks.sql`.
-
-For exact production-style min/max and ad-hoc threshold counts, use the derived analytics layer in `sql/06_channel_analytics.sql` and `docs/06_channel_analytics_layer.md`.
