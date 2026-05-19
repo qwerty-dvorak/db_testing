@@ -28,6 +28,7 @@ echo ""
 
 uv run python setup_db.py \
     --pgdata "$PGDATA" \
+    --db "$DB_NAME" \
     --rows "$SAMPLE_ROWS"
 
 log "All done! Run 'uv run python main.py status' to check."

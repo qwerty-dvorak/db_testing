@@ -5,10 +5,16 @@
 | Dependency      | Minimum Version | Check Command                 |
 |-----------------|-----------------|-------------------------------|
 | PostgreSQL      | 14 (18 tested)  | `pg_config --version`         |
-| Python          | 3.13            | `python3 --version`           |
+| Python          | 3.10            | `python3 --version`           |
 | uv              | 0.5+            | `uv --version`                |
 
 ## Quick Start
+
+```bash
+# Docker: PostgreSQL 14 with persistent volume + Python 3.10 app
+docker compose up --build app
+docker compose run --rm app python main.py status
+```
 
 ```bash
 # 1 — install dependencies

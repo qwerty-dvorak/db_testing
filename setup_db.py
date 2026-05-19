@@ -1,6 +1,6 @@
 #!/usr/bin/env -S uv run python
 # /// script
-# requires-python = ">=3.13"
+# requires-python = ">=3.10"
 # dependencies = ["psycopg>=3.2"]
 # ///
 """
@@ -25,6 +25,7 @@ import time
 from pathlib import Path
 
 import psycopg
+from psycopg import sql
 
 from scripts.connection import connstr, get_conn
 from scripts.schema import create_table, drop_table
@@ -80,15 +81,15 @@ def start_postgres(pgdata: Path) -> None:
     print("[INFO] PostgreSQL started")
 
 
-def create_database(host: str, port: int) -> None:
+def create_database(host: str, port: int, dbname: str) -> None:
     """Create project_db if it does not exist."""
     conn = get_conn(host, port, "postgres", autocommit=True)
-    cur = conn.execute("SELECT 1 FROM pg_database WHERE datname='project_db'")
+    cur = conn.execute("SELECT 1 FROM pg_database WHERE datname = %s", (dbname,))
     if cur.fetchone() is None:
-        conn.execute("CREATE DATABASE project_db")
-        print("[INFO] Database 'project_db' created")
+        conn.execute(sql.SQL("CREATE DATABASE {}").format(sql.Identifier(dbname)))
+        print(f"[INFO] Database '{dbname}' created")
     else:
-        print("[INFO] Database 'project_db' already exists")
+        print(f"[INFO] Database '{dbname}' already exists")
     conn.close()
 
 
@@ -101,11 +102,19 @@ def main() -> None:
         help="PostgreSQL data directory (default: /tmp/pgdata)",
     )
     parser.add_argument(
-        "--host", default="/tmp",
+        "--host", default=os.getenv("PGHOST", "/tmp"),
         help="PostgreSQL host / socket directory (default: /tmp)",
     )
     parser.add_argument(
-        "--port", type=int, default=5432, help="PostgreSQL port (default: 5432)",
+        "--port",
+        type=int,
+        default=int(os.getenv("PGPORT", "5432")),
+        help="PostgreSQL port (default: 5432)",
+    )
+    parser.add_argument(
+        "--db",
+        default=os.getenv("PGDATABASE", "project_db"),
+        help="Database name (default: project_db)",
     )
     parser.add_argument(
         "--no-start", action="store_true",
@@ -136,9 +145,9 @@ def main() -> None:
     if not args.no_start:
         start_postgres(Path(args.pgdata))
 
-    create_database(args.host, args.port)
+    create_database(args.host, args.port, args.db)
 
-    conn = get_conn(args.host, args.port, "project_db")
+    conn = get_conn(args.host, args.port, args.db)
 
     print("\n[1/4] Creating schema ...")
     drop_table(conn)

@@ -4,6 +4,21 @@ Benchmarking framework for storing and querying **1024-channel floating-point se
 
 ## Quick Start
 
+### Docker
+
+```bash
+# Build the Python 3.10 app image, start PostgreSQL 14, and initialise data
+docker compose up --build app
+
+# Run CLI commands against the persisted PostgreSQL volume
+docker compose run --rm app python main.py status
+docker compose run --rm app python main.py benchmark --iterations 5
+```
+
+Database files are stored in the named Docker volume `db_testing_postgres_data`.
+
+### Local
+
 ```bash
 # Install dependencies
 uv sync
@@ -93,5 +108,5 @@ uv run python main.py query "SELECT count(*) FROM sensor_payloads"
 ## Requirements
 
 - PostgreSQL 14+ (16 or 18 tested)
-- Python 3.13+
+- Python 3.10+
 - uv 0.5+

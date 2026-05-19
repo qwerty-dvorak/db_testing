@@ -8,26 +8,34 @@ Usage:
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 import psycopg
 import psycopg.conninfo
 
 
-def connstr(host: str = "/tmp", port: int = 5432, dbname: str = "project_db") -> str:
+def connstr(
+    host: str | None = None,
+    port: int | None = None,
+    dbname: str | None = None,
+) -> str:
     """Build a libpq connection string.
 
     Detects Unix socket (path starting with /) vs. TCP hostname.
     """
+    host = host or os.getenv("PGHOST", "/tmp")
+    port = port or int(os.getenv("PGPORT", "5432"))
+    dbname = dbname or os.getenv("PGDATABASE", "project_db")
     if host.startswith("/"):
         return f"host={host} port={port} dbname={dbname}"
     return f"host={host} port={port} dbname={dbname}"
 
 
 def get_conn(
-    host: str = "/tmp",
-    port: int = 5432,
-    dbname: str = "project_db",
+    host: str | None = None,
+    port: int | None = None,
+    dbname: str | None = None,
     autocommit: bool = False,
 ) -> psycopg.Connection:
     """Return a psycopg connection to the target database.

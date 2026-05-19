@@ -1,0 +1,42 @@
+services:
+  db:
+    image: postgres:14
+    environment:
+      POSTGRES_DB: project_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d project_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  app:
+    build:
+      context: .
+    environment:
+      PGHOST: db
+      PGPORT: "5432"
+      PGDATABASE: project_db
+      PGUSER: postgres
+      PGPASSWORD: postgres
+    depends_on:
+      db:
+        condition: service_healthy
+    command:
+      - python
+      - setup_db.py
+      - --no-start
+      - --host
+      - db
+      - --port
+      - "5432"
+      - --db
+      - project_db
+      - --rows
+      - "100"
+
+volumes:
+  postgres_data:

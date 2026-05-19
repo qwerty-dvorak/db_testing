@@ -1,6 +1,6 @@
 #!/usr/bin/env -S uv run python
 # /// script
-# requires-python = ">=3.13"
+# requires-python = ">=3.10"
 # dependencies = ["psycopg>=3.2"]
 # ///
 """
@@ -17,6 +17,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 
 from scripts.connection import get_conn, server_version
@@ -122,9 +123,22 @@ def main() -> None:
     parser = argparse.ArgumentParser(
         description="High-dimensional sensor data benchmarking toolkit",
     )
-    parser.add_argument("--host", default="/tmp", help="PostgreSQL host / socket dir")
-    parser.add_argument("--port", type=int, default=5432, help="PostgreSQL port")
-    parser.add_argument("--db", default="project_db", help="Database name")
+    parser.add_argument(
+        "--host",
+        default=os.getenv("PGHOST", "/tmp"),
+        help="PostgreSQL host / socket dir",
+    )
+    parser.add_argument(
+        "--port",
+        type=int,
+        default=int(os.getenv("PGPORT", "5432")),
+        help="PostgreSQL port",
+    )
+    parser.add_argument(
+        "--db",
+        default=os.getenv("PGDATABASE", "project_db"),
+        help="Database name",
+    )
 
     sub = parser.add_subparsers(dest="command", required=True)
 
