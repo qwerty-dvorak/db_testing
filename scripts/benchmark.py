@@ -338,6 +338,7 @@ def run_benchmark(
             result.first_row = rows[0] if rows else None
         except Exception as e:
             result.error = str(e)
+            conn.rollback()
             return result
 
     for _ in range(iterations):
@@ -348,6 +349,7 @@ def run_benchmark(
             result.first_row = rows[0] if rows else None
         except Exception as e:
             result.error = str(e)
+            conn.rollback()
             return result
 
     return result

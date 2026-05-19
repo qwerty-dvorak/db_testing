@@ -49,6 +49,7 @@ def verify_all(conn: psycopg.Connection) -> VerificationReport:
         report.table_exists = cur.fetchone() is not None
     except Exception as e:
         report.errors.append(f"table check: {e}")
+        conn.rollback()
 
     if not report.table_exists:
         return report
@@ -58,6 +59,7 @@ def verify_all(conn: psycopg.Connection) -> VerificationReport:
         report.row_count = cur.fetchone()[0]
     except Exception as e:
         report.errors.append(f"row count: {e}")
+        conn.rollback()
 
     try:
         cur = conn.execute(
@@ -66,6 +68,7 @@ def verify_all(conn: psycopg.Connection) -> VerificationReport:
         report.table_size = cur.fetchone()[0]
     except Exception as e:
         report.errors.append(f"table size: {e}")
+        conn.rollback()
 
     try:
         cur = conn.execute(
@@ -74,6 +77,7 @@ def verify_all(conn: psycopg.Connection) -> VerificationReport:
         report.index_count = cur.fetchone()[0]
     except Exception as e:
         report.errors.append(f"index count: {e}")
+        conn.rollback()
 
     for table in [
         "sensor_payloads",
@@ -91,6 +95,7 @@ def verify_all(conn: psycopg.Connection) -> VerificationReport:
             report.layout_sizes[table] = str(cur.fetchone()[0])
         except Exception as e:
             report.errors.append(f"{table} layout check: {e}")
+            conn.rollback()
 
     if report.layout_counts:
         distinct_counts = set(report.layout_counts.values())
@@ -105,6 +110,7 @@ def verify_all(conn: psycopg.Connection) -> VerificationReport:
         report.aggregates_ok = cur.fetchone() is not None
     except Exception as e:
         report.errors.append(f"aggregate check: {e}")
+        conn.rollback()
 
     if report.aggregates_ok and report.row_count > 0:
         try:
@@ -124,6 +130,7 @@ def verify_all(conn: psycopg.Connection) -> VerificationReport:
             report.total_values = int(r[3])
         except Exception as e:
             report.errors.append(f"aggregate query: {e}")
+            conn.rollback()
 
     try:
         cur = conn.execute("""
@@ -139,6 +146,7 @@ def verify_all(conn: psycopg.Connection) -> VerificationReport:
             })
     except Exception as e:
         report.errors.append(f"sample rows: {e}")
+        conn.rollback()
 
     return report
 
