@@ -14,6 +14,7 @@ docker compose run --rm setup
 docker compose run --rm seed
 docker compose run --rm app uv run python main.py status
 docker compose run --rm app uv run python main.py benchmark --iterations 5 --warmup 2
+docker compose run --rm app uv run python main.py benchmark-optimisations --iterations 3 --warmup 1
 ```
 
 Local:
@@ -52,11 +53,15 @@ uv run python setup_db.py --rows 100
 uv run python main.py verify
 uv run python main.py generate --bulk --rows 10000 --channels 1024 --batch-size 10000
 uv run python main.py benchmark --iterations 5 --warmup 2 --channel 512 --threshold 50
+uv run python main.py benchmark-optimisations --iterations 3 --warmup 1 --channel 512 --threshold 50
 uv run python main.py query "SELECT count(*) FROM sensor_payloads"
 ```
 
 Benchmark output includes warmup times, every timed run, result row counts,
 avg/min/median/max/stdev, and total measured query time.
+The optimisation benchmark also reports table-build time, index-build time,
+query time, total time including build work, and speedup against the matching
+baseline threshold scan where available.
 
 ## Project Structure
 
@@ -92,7 +97,7 @@ avg/min/median/max/stdev, and total measured query time.
 |----------|--------|
 | [Architecture](docs/01_architecture_overview.md) | Four layouts, row-size limits, real-time analysis model |
 | [Setup](docs/02_setup_guide.md) | Local and Docker setup, reset workflow, CLI commands |
-| [Benchmarking](docs/03_benchmarking.md) | Query groups, timing output, plan inspection |
+| [Benchmarking](docs/03_benchmarking.md) | Query groups, optimisation runs, timing output, plan inspection |
 | [Docker](docs/04_docker.md) | Compose services, port 5433, volume reset |
 | [Layout Reference](docs/05_1024_channel_performance_plan.md) | Schema shapes and tradeoffs |
 | [Fresh VM Runbook](docs/06_fresh_vm_runbook.md) | Start from a clean VM and run setup, seed, verify, benchmark |

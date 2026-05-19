@@ -47,8 +47,13 @@ SEED_ROWS=100000 SEED_BATCH_SIZE=10000 docker compose run --rm seed
 ```bash
 docker compose run --rm app uv run python main.py verify
 docker compose run --rm app uv run python main.py benchmark --iterations 5 --warmup 2
+docker compose run --rm app uv run python main.py benchmark-optimisations --iterations 3 --warmup 1 --channel 512 --threshold 50
 docker compose run --rm app uv run python main.py query "SELECT count(*) FROM sensor_payloads"
 ```
+
+`benchmark-optimisations` creates benchmark-only indexes and derived tables,
+then includes that build time in the reported totals. It drops prior
+benchmark-created artifacts for the selected channel at the start of each run.
 
 ## Reset
 

@@ -106,6 +106,16 @@ Standard benchmark:
 docker compose run --rm app uv run python main.py benchmark --iterations 5 --warmup 2 --channel 512 --threshold 50
 ```
 
+Threshold optimisation benchmark:
+
+```bash
+docker compose run --rm app uv run python main.py benchmark-optimisations --iterations 3 --warmup 1 --channel 512 --threshold 50
+```
+
+This run compares the no-optimisation threshold scans against expression
+indexes, a wide-column index, and derived channel tables. Any table or index
+created by the optimisation benchmark is included in the reported build time.
+
 ## 9. Connect To PostgreSQL From The Host
 
 Connection details:

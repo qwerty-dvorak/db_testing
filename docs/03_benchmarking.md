@@ -56,6 +56,45 @@ Container comparison:
 docker compose run --rm app uv run python main.py benchmark --iterations 5 --warmup 2
 ```
 
+## Optimisation Benchmark
+
+Use this command for focused threshold-count experiments:
+
+```bash
+uv run python main.py benchmark-optimisations --iterations 3 --warmup 1 --channel 512 --threshold 50
+```
+
+The optimisation suite starts by dropping benchmark-created optimisation
+artifacts for the selected channel. It then runs the no-optimisation threshold
+baselines before building any expression indexes or derived tables.
+
+It currently measures:
+
+| Family | Variants |
+|--------|----------|
+| JSONB array channel threshold | Sequential scan, expression index |
+| JSONB object channel threshold | Sequential scan, expression index |
+| `real[]` channel threshold | Sequential scan, expression index, hot-channel derived table, all-channel normalized derived table |
+| wide channel threshold | Sequential scan, direct column index |
+| JSONB array all-channel threshold | `jsonb_array_elements_text` vs `jsonb_array_elements` |
+
+For derived tables and indexes, build work is part of the reported benchmark.
+The summary includes:
+
+- count of rows where the selected channel is greater than the threshold
+- total build time
+- table-build time
+- index-build time
+- average timed query time
+- total time including build, warmup, and timed query runs
+- query speedup against the first baseline in the same family
+
+Container run:
+
+```bash
+docker compose run --rm app uv run python main.py benchmark-optimisations --iterations 3 --warmup 1 --channel 512 --threshold 50
+```
+
 ## Inspecting Plans
 
 For deeper diagnosis, use `EXPLAIN (ANALYZE, BUFFERS)` manually through

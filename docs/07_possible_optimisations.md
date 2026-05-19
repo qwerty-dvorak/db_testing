@@ -11,6 +11,7 @@ Before changing implementation details, capture:
 ```bash
 docker compose run --rm app uv run python main.py verify
 docker compose run --rm app uv run python main.py benchmark --iterations 5 --warmup 2
+docker compose run --rm app uv run python main.py benchmark-optimisations --iterations 3 --warmup 1 --channel 512 --threshold 50
 ```
 
 For query plans, run `EXPLAIN (ANALYZE, BUFFERS)` manually against the specific
@@ -31,7 +32,7 @@ query being changed.
 | Idea | Why It May Help | Tradeoff |
 |------|------------------|----------|
 | Keep only the winning layout in production | Saves 3x duplicate storage/write work | Loses direct apples-to-apples comparisons |
-| Add generated columns for hot JSONB channels | Speeds single-channel reads from JSONB | Adds storage and write cost |
+| Add generated columns or expression indexes for hot JSONB channels | Speeds single-channel reads from JSONB | Adds storage and write cost |
 | Add BRIN indexes on `created_at` | Useful for append-like time range scans | Low value for full-table benchmarks |
 | Partition by time | Reduces scanned data for bounded time windows | More operational complexity |
 | Test `real[]` with no GIN index | Current benchmark does full scans; extra indexes may only add write cost | Less flexible for future predicates |
@@ -87,11 +88,36 @@ Potential database-level settings:
 | Add `--layouts` and `--metrics` filters | Faster focused iteration |
 | Add cold-cache and warm-cache modes | Separates storage I/O from CPU execution |
 
+## Implemented Optimisation Benchmarks
+
+The command below runs focused experiments for the selected channel and
+threshold:
+
+```bash
+uv run python main.py benchmark-optimisations --iterations 3 --warmup 1 --channel 512 --threshold 50
+```
+
+The suite compares no-optimisation threshold scans with these variants:
+
+| Experiment | What It Measures | Build Cost Included |
+|------------|------------------|---------------------|
+| JSONB array expression index | `count(*)` where one JSONB array element is above threshold | Yes, index build and analyze |
+| JSONB object expression index | `count(*)` where one named JSONB key is above threshold | Yes, index build and analyze |
+| `real[]` expression index | `count(*)` where one array offset is above threshold | Yes, index build and analyze |
+| wide direct column index | `count(*)` where one wide column is above threshold | Yes, index build and analyze |
+| hot-channel derived table | Build one narrow table from `real[]`, then query `value > threshold` | Yes, table build, index build, analyze |
+| all-channel normalized table | Build `(reading_id, channel_idx, value)` rows from `real[]`, then query one channel | Yes, table build, index build, analyze |
+| JSONB array element expansion | Compare `jsonb_array_elements_text` with `jsonb_array_elements` for all-channel threshold counts | No build phase |
+
+The no-optimisation baselines run before any benchmark-created indexes or
+derived tables are created. The command removes previous benchmark-created
+artifacts for the selected channel at the start of the run.
+
 ## Current High-Value Next Steps
 
 1. Add benchmark result export to JSON.
 2. Add optional `EXPLAIN (ANALYZE, BUFFERS)` capture per benchmark query.
-3. Add time-distributed seed data and benchmark time-window queries.
+3. Add time-distributed seed data and benchmark time-window queries with BRIN.
 4. Test dropping GIN indexes during seed, then recreate them after loading.
 5. Compare the current wide all-channel min/max query with chunked direct-column
    aggregate queries.

@@ -55,6 +55,7 @@ uv run python main.py verify
 uv run python main.py generate --rows 1000 --channels 1024
 uv run python main.py generate --bulk --rows 10000 --channels 1024 --batch-size 10000
 uv run python main.py benchmark --iterations 5 --warmup 2 --threshold 50
+uv run python main.py benchmark-optimisations --iterations 3 --warmup 1 --channel 512 --threshold 50
 uv run python main.py query "SELECT count(*) FROM sensor_payloads"
 ```
 

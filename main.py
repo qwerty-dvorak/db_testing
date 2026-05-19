@@ -11,6 +11,7 @@ Usage:
     uv run python main.py verify
     uv run python main.py generate --rows 1000
     uv run python main.py benchmark --iterations 5
+    uv run python main.py benchmark-optimisations --iterations 3
     uv run python main.py query "SELECT count(*) FROM sensor_payloads"
 """
 
@@ -22,7 +23,12 @@ import os
 from scripts.connection import get_conn, server_version
 from scripts.schema import layout_stats, table_exists, row_count, table_size
 from scripts.sample_data import generate_bulk, generate_samples
-from scripts.benchmark import run_benchmarks, print_results
+from scripts.benchmark import (
+    print_optimisation_results,
+    print_results,
+    run_benchmarks,
+    run_optimisation_benchmarks,
+)
 from scripts.verify import verify_all, print_report
 
 
@@ -96,6 +102,19 @@ def cmd_benchmark(args: argparse.Namespace) -> None:
     conn.close()
 
 
+def cmd_benchmark_optimisations(args: argparse.Namespace) -> None:
+    conn = get_conn(args.host, args.port, args.db)
+    results = run_optimisation_benchmarks(
+        conn,
+        iterations=args.iterations,
+        warmup=args.warmup,
+        channel_index=args.channel - 1,
+        threshold=args.threshold,
+    )
+    print_optimisation_results(results)
+    conn.close()
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(
         description="High-dimensional sensor data benchmarking toolkit",
@@ -156,6 +175,26 @@ def main() -> None:
         help="Threshold for per-channel count benchmarks",
     )
 
+    bo = sub.add_parser(
+        "benchmark-optimisations",
+        aliases=["benchmark-optimizations"],
+        help="Run threshold optimisation benchmarks with build time included",
+    )
+    bo.add_argument("--iterations", type=int, default=5, help="Runs per query")
+    bo.add_argument("--warmup", type=int, default=2, help="Warmup runs per query")
+    bo.add_argument(
+        "--channel",
+        type=int,
+        default=512,
+        help="1-based channel number for threshold benchmarks",
+    )
+    bo.add_argument(
+        "--threshold",
+        type=float,
+        default=50.0,
+        help="Threshold for channel count benchmarks",
+    )
+
     args = parser.parse_args()
 
     commands = {
@@ -164,6 +203,8 @@ def main() -> None:
         "query": cmd_query,
         "generate": cmd_generate,
         "benchmark": cmd_benchmark,
+        "benchmark-optimisations": cmd_benchmark_optimisations,
+        "benchmark-optimizations": cmd_benchmark_optimisations,
     }
 
     commands[args.command](args)
